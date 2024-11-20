@@ -193,16 +193,16 @@
 		const keysList = {};
 		keysEvent.forEach((key) => {
 			const tableau = 'Objectifs ' + new Date(selectedDate).getFullYear();
-			keysList['c_s_' + key + '_' + tableau] = { id: 'c_s_' + key + '_' + tableau, value: key, selected: false };
+			keysList['c_s_' + key] = { id: 'c_s_' + key, value: key, selected: false };
 			switch (key) {
 				case 'reseau':
 				case 'date':
 				case 'titre':
 				case 'type':
-					keysList['c_s_' + key + '_' + tableau].selected = true;
+					keysList['c_s_' + key].selected = true;
 					break;
 				default:
-					keysList['c_s_' + key + '_' + tableau].selected = false;
+					keysList['c_s_' + key].selected = false;
 					break;
 			}
 		});
@@ -300,6 +300,13 @@
 			tableau: tableau,
 			ligne: ligne,
 			reseau: event[COL_RESEAU],
+			type: event[COL_TYPE],
+			titre: event[COL_TITRE],
+			items: event[COL_ITEMS],
+			objectifs: event[COL_OBJECTIFS],
+			etatCrea: event[COL_ETAT_CREA],
+			etatEdito: event[COL_ETAT_EDITO],
+			etatPrecision: event[COL_ETAT_PRECISION],
 			date: event[COL_DATE] ? convertAbregedStringToDate(event[COL_DATE]) : '',
 		};
 		if (getListKeys) {
@@ -443,6 +450,32 @@
 	// Gestions des reseaux modifié/n'existant pas
 	async function ajusterReseau(reseau, getColor = false) {
 		let reseauEdit = reseau;
+		/*switch (reseau) {
+			case 'IG':
+				reseauEdit = 'Instagram';
+				break;
+			case 'LK':
+				reseauEdit = 'LinkedIn';
+				break;
+			case 'YT':
+				reseauEdit = 'YouTube';
+				break;
+			case 'X':
+				reseauEdit = 'X';
+				break;
+			case 'FB':
+				reseauEdit = 'Facebook';
+				break;
+			case 'TK':
+				reseauEdit = 'TikTok';
+				break;
+			case 'GDES SEQ.':
+				reseauEdit = 'GDES SEQ.';
+				break;
+			default:
+				reseauEdit = reseau;
+				break;
+		}*/
 		if (!getColor) {
 			if (!listeReseauJSON[reseauEdit]) {
 				const couleurReseau = '#CDC1FF';
@@ -515,9 +548,9 @@
 
 	async function appearEventIntoColumns(column, eventsList) {
 		const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-		const allKeysWhatToShow = await DB.getItem('AgendaCom', 'Preferences', 'whatToShow');
-		const keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
-		eventsList.forEach((event) => {
+		let allKeysWhatToShow = await DB.getItem('AgendaCom', 'Preferences', 'whatToShow');
+		let keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
+		eventsList.forEach(async (event) => {
 			let calendarContainer = column.querySelector(`.calendar-event-container[data-heure-debut="${event.heureDebut}"]`);
 			if (!calendarContainer) {
 				calendarContainer = document.createElement('div');
@@ -543,21 +576,31 @@
 			let hoursAdded = false;
 			let aleardyAdded = [];
 
-			const keysSelectedAndInTableau = keysToShow.filter((key) => key.selected && key.id.includes(event.tableau));
-			keysSelectedAndInTableau.forEach((key) => {
-				const keyToShow = key.value;
-				console.log(keyToShow);
-				if (keyToShow == 'date') {
-					eventContent.innerHTML += `<div class="calendar-event-content-date">${convertDateToAbregedString(new Date(event.date))}</div>`;
-				} else if (keyToShow == 'titre') {
-					eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500; margin-bottom: 0.5vh">${event[keyToShow]}</div>`;
-				} else if (keyToShow == 'reseau') {
-					eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500;">${event[keyToShow]}</div>`;
-				} else {
-					eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}">${formatString(keyToShow)} : ${event[keyToShow]}</div>`;
+			async function getKeys() {
+				const keysSelectedAndInTableau = keysToShow.filter((key) => key.selected);
+				if (keysSelectedAndInTableau.length == 0) {
+					allKeysWhatToShow = await DB.getItem('Agenda', 'Preferences', 'whatToShow');
+					keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
+					setTimeout(() => {
+						getKeys();
+					}, 1000);
 				}
-			});
+				keysSelectedAndInTableau.forEach((key) => {
+					const keyToShow = key.value;
+					console.log(keyToShow);
+					if (keyToShow == 'date') {
+						eventContent.innerHTML += `<div class="calendar-event-content-date">${convertDateToAbregedString(new Date(event.date))}</div>`;
+					} else if (keyToShow == 'titre') {
+						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500; margin-bottom: 0.5vh">${event[keyToShow]}</div>`;
+					} else if (keyToShow == 'reseau') {
+						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500;">${event[keyToShow]}</div>`;
+					} else {
+						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}">${formatString(keyToShow)} : ${event[keyToShow]}</div>`;
+					}
+				});
+			}
 
+			await getKeys();
 			eventElement.appendChild(eventContent);
 			calendarContainer.appendChild(eventElement);
 			column.querySelector('.calendar-columns-content').appendChild(calendarContainer);
@@ -588,6 +631,7 @@
 
 			eventElement.addEventListener('mouseleave', () => {
 				eventContent.style.backgroundColor = colorBackground;
+				eventElement.style.height = '';
 				eventContent.querySelectorAll('div').forEach((element) => {
 					element.style.whiteSpace = '';
 				});
@@ -739,17 +783,17 @@
 
 		const keysArray = Object.values(Object.values(allKeys)[1]);
 		const keysEvent = keysArray.filter((key) => {
-			return key.id && key.id.includes('_Event');
+			return key.id;
 		});
-		const keysMed = keysArray.filter((key) => {
-			return key.id && key.id.includes('_Med');
-		});
-
 		const title = document.createElement('div');
 		title.textContent = 'Liste Éléments';
 		title.className = 'titleList';
 		elementToShowList.appendChild(title);
-
+		if (keysEvent.length <= 0) {
+			setTimeout(() => {
+				generateListElementToShow();
+			}, 2000);
+		}
 		keysEvent.forEach((key) => {
 			const element = document.createElement('label');
 			const mdCheckbox = document.createElement('md-checkbox');
