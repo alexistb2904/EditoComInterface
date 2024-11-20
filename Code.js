@@ -1,4 +1,4 @@
-// Génération de l'interface ! NE PAS TOUCHER !
+// Génération de l'interface de COM ! NE PAS TOUCHER !
 function doGet() {
 	return HtmlService.createTemplateFromFile('index')
 		.evaluate()
