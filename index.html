@@ -1,0 +1,94 @@
+<head>
+	<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+	<script type="importmap">
+		{
+			"imports": {
+				"@material/web/": "https://esm.run/@material/web/"
+			}
+		}
+	</script>
+	<script type="module">
+		import '@material/web/all.js';
+		import { styles as typescaleStyles } from '@material/web/typography/md-typescale-styles.js';
+
+		document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
+	</script>
+
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+	<script src="https://npmcdn.com/flatpickr/dist/flatpickr.min.js"></script>
+	<script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+	<link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet" />
+
+	<link rel="stylesheet" href="style.html" />
+	<?!= include('style.html') ?>
+</head>
+<body>
+	<div id="main">
+		<div id="menu-left">
+			<div>
+				<div id="menuDatePicker"></div>
+			</div>
+			<span class="button-holder">
+				<md-filled-button id="create-event-button" class="width-100" has-icon="true" aria-label="Permet d'ajouter un événement.">
+					<md-icon slot="icon">add</md-icon>Créer</md-filled-button
+				>
+				<md-menu id="create-event-list" anchor="create-event-button" anchor-corner="start-end">
+					<md-menu-item>
+						<div slot="headline">Programmation</div>
+					</md-menu-item>
+					<md-menu-item>
+						<div slot="headline">Médiation</div>
+					</md-menu-item>
+				</md-menu>
+			</span>
+			<md-outlined-button class="width-100" has-icon="true" id="search-button"><md-icon slot="icon">search</md-icon>Rechercher</md-outlined-button>
+			<md-outlined-button class="width-100 viewModeBtn selected" has-icon="true" id="day-button" data-view="day" data-selected="false"
+				><md-icon slot="icon">calendar_view_day</md-icon>Vue Jour</md-outlined-button
+			>
+			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="week-button" data-view="week" data-selected="true"
+				><md-icon slot="icon">calendar_view_week</md-icon>Vue Semaine</md-outlined-button
+			>
+			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="month-button" data-selected="false"
+				><md-icon slot="icon">calendar_view_month</md-icon>Vue Mensuelle</md-outlined-button
+			>
+			<div id="listeReseaux-menu"></div>
+		</div>
+		<div id="content">
+			<div id="listOfHours">
+				<span id="regulateHeightHours"></span>
+			</div>
+			<div id="content-calendar" widthColumns="40">
+				<div id="calendar-special-column"></div>
+			</div>
+		</div>
+		<div id="menu-right">
+			<md-tabs aria-label="Tabs entre le contenu et les paramètres">
+				<md-primary-tab id="content-tab" aria-controls="content-panel"><md-icon slot="icon">toc</md-icon>Contenu</md-primary-tab>
+				<md-primary-tab id="settings-tab" aria-controls="settings-panel"><md-icon slot="icon">settings</md-icon>Paramètres</md-primary-tab>
+			</md-tabs>
+			<div id="content-tab" role="tabpanel" aria-labelledby="content-tab">Photo</div>
+			<div id="settings-tab" role="tabpanel" aria-labelledby="settings-tab" hidden>
+				<md-filled-button id="change-theme-button" class="width-100" has-icon="true" aria-label="Change le Thème">
+					<md-icon slot="icon">palette</md-icon>Changer le Thème</md-filled-button
+				>
+				<div id="what-see-event-container">
+					<md-filled-button id="what-see-event-button" class="width-100" has-icon="true" aria-label="Change les éléments à afficher">
+						<md-icon slot="icon">visibility</md-icon>Éléments à afficher</md-filled-button
+					>
+					<div id="what-see-event-checkbox-list" data-open="false"></div>
+				</div>
+
+				<div id="color-event-container">
+					<md-filled-button id="color-event-button" class="width-100" has-icon="true" aria-label="Change la couleur des événements">
+						<md-icon slot="icon">format_paint</md-icon>Couleurs des reseaux</md-filled-button
+					>
+					<div id="color-event-list" data-open="false"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<?!= include('variablesConfig.html') ?>
+	<?!= include('script.html') ?>
+</body>

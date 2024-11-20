@@ -1,0 +1,754 @@
+<style>
+	/*
+	   Ce projet utilise https://material-web.dev/ pour les couleurs et certains composants.
+	   */
+
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	body {
+		margin: 0;
+		padding: 0;
+		font-family: 'Roboto', sans-serif;
+	}
+
+	:root {
+		--md-sys-shape-corner-extra-large: 28px;
+		--md-sys-shape-corner-extra-large-top: 28px 28px 0px 0px;
+		--md-sys-shape-corner-extra-small: 4px;
+		--md-sys-shape-corner-extra-small-top: 4px 4px 0px 0px;
+		--md-sys-shape-corner-small-top: 8px 8px 0px 0px;
+		--md-sys-shape-corner-medium-top: 12px 12px 0px 0px;
+		--md-sys-shape-corner-full: 9999px;
+		--md-sys-shape-corner-large: 16px;
+		--md-sys-shape-corner-large-end: 0px 16px 16px 0px;
+		--md-sys-shape-corner-large-start: 16px 0px 0px 16px;
+		--md-sys-shape-corner-large-top: 16px 16px 0px 0px;
+		--md-sys-shape-corner-medium: 12px;
+		--md-sys-shape-corner-none: 0px;
+		--md-sys-shape-corner-small: 8px;
+
+		--md-icon-font: 'Material Symbols Rounded';
+
+		--md-primary-tab-container-color: var(--md-sys-color-surface-container);
+		--md-primary-tab-container-shape: var(--md-sys-shape-corner-extra-small);
+	}
+
+	html {
+		--md-sys-color-primary: rgb(81 91 146);
+		--md-sys-color-surface-tint: rgb(81 91 146);
+		--md-sys-color-on-primary: rgb(255 255 255);
+		--md-sys-color-primary-container: rgb(222 224 255);
+		--md-sys-color-on-primary-container: rgb(11 21 75);
+		--md-sys-color-secondary: rgb(91 93 114);
+		--md-sys-color-on-secondary: rgb(255 255 255);
+		--md-sys-color-secondary-container: rgb(224 225 249);
+		--md-sys-color-on-secondary-container: rgb(24 26 44);
+		--md-sys-color-tertiary: rgb(119 83 109);
+		--md-sys-color-on-tertiary: rgb(255 255 255);
+		--md-sys-color-tertiary-container: rgb(255 215 241);
+		--md-sys-color-on-tertiary-container: rgb(45 18 40);
+		--md-sys-color-error: rgb(186 26 26);
+		--md-sys-color-on-error: rgb(255 255 255);
+		--md-sys-color-error-container: rgb(255 218 214);
+		--md-sys-color-on-error-container: rgb(65 0 2);
+		--md-sys-color-background: rgb(251 248 255);
+		--md-sys-color-on-background: rgb(27 27 33);
+		--md-sys-color-surface: rgb(251 248 255);
+		--md-sys-color-on-surface: rgb(27 27 33);
+		--md-sys-color-surface-variant: rgb(227 225 236);
+		--md-sys-color-on-surface-variant: rgb(70 70 79);
+		--md-sys-color-outline: rgb(118 118 128);
+		--md-sys-color-outline-variant: rgb(199 197 208);
+		--md-sys-color-shadow: rgb(0 0 0);
+		--md-sys-color-scrim: rgb(0 0 0);
+		--md-sys-color-inverse-surface: rgb(48 48 54);
+		--md-sys-color-inverse-on-surface: rgb(242 239 247);
+		--md-sys-color-inverse-primary: rgb(187 195 255);
+		--md-sys-color-primary-fixed: rgb(222 224 255);
+		--md-sys-color-on-primary-fixed: rgb(11 21 75);
+		--md-sys-color-primary-fixed-dim: rgb(187 195 255);
+		--md-sys-color-on-primary-fixed-variant: rgb(58 67 121);
+		--md-sys-color-secondary-fixed: rgb(224 225 249);
+		--md-sys-color-on-secondary-fixed: rgb(24 26 44);
+		--md-sys-color-secondary-fixed-dim: rgb(195 197 221);
+		--md-sys-color-on-secondary-fixed-variant: rgb(67 70 89);
+		--md-sys-color-tertiary-fixed: rgb(255 215 241);
+		--md-sys-color-on-tertiary-fixed: rgb(45 18 40);
+		--md-sys-color-tertiary-fixed-dim: rgb(230 186 215);
+		--md-sys-color-on-tertiary-fixed-variant: rgb(93 60 85);
+		--md-sys-color-surface-dim: rgb(219 217 224);
+		--md-sys-color-surface-bright: rgb(251 248 255);
+		--md-sys-color-surface-container-lowest: rgb(255 255 255);
+		--md-sys-color-surface-container-low: rgb(245 242 250);
+		--md-sys-color-surface-container: rgb(239 237 244);
+		--md-sys-color-surface-container-high: rgb(233 231 239);
+		--md-sys-color-surface-container-highest: rgb(228 225 233);
+		--md-extended-color-custom-color-color: rgb(58 96 143);
+		--md-extended-color-custom-color-on-color: rgb(255 255 255);
+		--md-extended-color-custom-color-color-container: rgb(211 227 255);
+		--md-extended-color-custom-color-on-color-container: rgb(0 28 57);
+
+		--color-green: #62b864;
+		--color-green-outline: #4e9f4f;
+		--color-red: #b53641;
+		--color-red-outline: #9e2a33;
+		--color-orange: #ffc49b;
+		--color-orange-outline: #e39e6e;
+		--color-violet: #d8b4e2;
+		--color-violet: #b68fc1;
+
+		background-color: var(--md-sys-color-background);
+		color: var(--md-sys-color-on-background);
+	}
+
+	html[dark] {
+		--md-sys-color-primary: rgb(187 195 255);
+		--md-sys-color-surface-tint: rgb(187 195 255);
+		--md-sys-color-on-primary: rgb(35 44 97);
+		--md-sys-color-primary-container: rgb(58 67 121);
+		--md-sys-color-on-primary-container: rgb(222 224 255);
+		--md-sys-color-secondary: rgb(195 197 221);
+		--md-sys-color-on-secondary: rgb(45 47 66);
+		--md-sys-color-secondary-container: rgb(67 70 89);
+		--md-sys-color-on-secondary-container: rgb(224 225 249);
+		--md-sys-color-tertiary: rgb(230 186 215);
+		--md-sys-color-on-tertiary: rgb(68 38 61);
+		--md-sys-color-tertiary-container: rgb(93 60 85);
+		--md-sys-color-on-tertiary-container: rgb(255 215 241);
+		--md-sys-color-error: rgb(255 180 171);
+		--md-sys-color-on-error: rgb(105 0 5);
+		--md-sys-color-error-container: rgb(147 0 10);
+		--md-sys-color-on-error-container: rgb(255 218 214);
+		--md-sys-color-background: rgb(18 19 24);
+		--md-sys-color-on-background: rgb(228 225 233);
+		--md-sys-color-surface: rgb(18 19 24);
+		--md-sys-color-on-surface: rgb(228 225 233);
+		--md-sys-color-surface-variant: rgb(70 70 79);
+		--md-sys-color-on-surface-variant: rgb(199 197 208);
+		--md-sys-color-outline: rgb(144 144 154);
+		--md-sys-color-outline-variant: rgb(70 70 79);
+		--md-sys-color-shadow: rgb(0 0 0);
+		--md-sys-color-scrim: rgb(0 0 0);
+		--md-sys-color-inverse-surface: rgb(228 225 233);
+		--md-sys-color-inverse-on-surface: rgb(48 48 54);
+		--md-sys-color-inverse-primary: rgb(81 91 146);
+		--md-sys-color-primary-fixed: rgb(222 224 255);
+		--md-sys-color-on-primary-fixed: rgb(11 21 75);
+		--md-sys-color-primary-fixed-dim: rgb(200, 206, 255);
+		--md-sys-color-on-primary-fixed-variant: rgb(58 67 121);
+		--md-sys-color-secondary-fixed: rgb(224 225 249);
+		--md-sys-color-on-secondary-fixed: rgb(24 26 44);
+		--md-sys-color-secondary-fixed-dim: rgb(195 197 221);
+		--md-sys-color-on-secondary-fixed-variant: rgb(67 70 89);
+		--md-sys-color-tertiary-fixed: rgb(255 215 241);
+		--md-sys-color-on-tertiary-fixed: rgb(45 18 40);
+		--md-sys-color-tertiary-fixed-dim: rgb(230 186 215);
+		--md-sys-color-on-tertiary-fixed-variant: rgb(93 60 85);
+		--md-sys-color-surface-dim: rgb(18 19 24);
+		--md-sys-color-surface-bright: rgb(57 57 63);
+		--md-sys-color-surface-container-lowest: rgb(13 14 19);
+		--md-sys-color-surface-container-low: rgb(27 27 33);
+		--md-sys-color-surface-container: rgb(31 31 37);
+		--md-sys-color-surface-container-high: rgb(41 41 47);
+		--md-sys-color-surface-container-highest: rgb(52 52 58);
+		--md-extended-color-custom-color-color: rgb(164 201 254);
+		--md-extended-color-custom-color-on-color: rgb(0 49 93);
+		--md-extended-color-custom-color-color-container: rgb(32 72 118);
+		--md-extended-color-custom-color-on-color-container: rgb(211 227 255);
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6,
+	p,
+	a {
+		color: var(--md-sys-color-on-background);
+	}
+
+	md-menu md-menu-item {
+		min-width: max-content;
+	}
+
+	md-filled-button {
+		--md-sys-color-primary: var(--md-sys-color-secondary);
+		--md-sys-color-on-primary: var(--md-sys-color-surface);
+	}
+
+	md-outlined-button {
+		--md-sys-color-primary: var(--md-sys-color-on-surface);
+	}
+
+	md-filled-button button {
+		display: inline-flex;
+		align-items: center;
+	}
+
+	md-menu md-menu-item label {
+		display: inline-flex;
+		gap: 1vw;
+		align-items: center;
+	}
+
+	.width-100 {
+		width: 100%;
+	}
+
+	.width-75 {
+		width: 75%;
+	}
+
+	.width-50 {
+		width: 50%;
+	}
+
+	.width-25 {
+		width: 25%;
+	}
+
+	#main {
+		height: 100vh;
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+		background-color: var(--md-sys-color-surface-container);
+	}
+
+	#menu-left,
+	#menu-right {
+		width: 13vw;
+		min-width: 190px;
+		gap: 1%;
+		padding: 1%;
+		display: flex;
+		flex-direction: column;
+		background-color: var(--md-sys-color-surface-container);
+		resize: horizontal;
+	}
+
+	#content {
+		flex: 1;
+		background-color: var(--md-sys-color-surface);
+		border-radius: var(--md-sys-shape-corner-large);
+		display: flex;
+		overflow-y: scroll;
+		padding: 0 0.5%;
+	}
+
+	@supports (scrollbar-color: auto) {
+		#content {
+			scrollbar-color: var(--md-sys-color-primary) var(--md-sys-color-surface);
+			scrollbar-width: thin;
+			scrollbar-track-color: var(--md-sys-color-surface);
+			scrollbar-gutter: stable;
+		}
+	}
+
+	@supports selector(::-webkit-scrollbar) {
+		#content::-webkit-scrollbar {
+			width: 0.5vw;
+			border-radius: var(--md-sys-shape-corner-large);
+		}
+
+		#content::-webkit-scrollbar-thumb {
+			background-color: var(--md-sys-color-primary);
+			border-radius: var(--md-sys-shape-corner-small);
+		}
+
+		#content::-webkit-scrollbar-track {
+			background-color: var(--md-sys-color-surface);
+			border-radius: var(--md-sys-shape-corner-large);
+		}
+
+		#content::-webkit-scrollbar-thumb:hover {
+			background-color: var(--md-sys-color-primary);
+		}
+
+		#content::-webkit-scrollbar-thumb:active {
+			background-color: var(--md-sys-color-primary);
+		}
+	}
+
+	.button-holder {
+		display: inline-flex;
+		justify-content: center;
+		position: relative;
+		width: 100%;
+	}
+
+	/* Picker Styles */
+	.flatpickr-calendar {
+		max-height: initial;
+		aspect-ratio: 1/1;
+		background-color: transparent;
+		box-shadow: none;
+		-webkit-box-shadow: none;
+	}
+
+	.flatpickr-calendar *,
+	.flatpickr-months .flatpickr-prev-month.flatpickr-next-month,
+	.flatpickr-months .flatpickr-next-month.flatpickr-next-month {
+		color: var(--md-sys-color-on-background) !important;
+		fill: var(--md-sys-color-on-background) !important;
+	}
+
+	.flatpickr-day.flatpickr-disabled,
+	.flatpickr-day.flatpickr-disabled:hover,
+	.flatpickr-day.prevMonthDay,
+	.flatpickr-day.nextMonthDay,
+	.flatpickr-day.notAllowed,
+	.flatpickr-day.notAllowed.prevMonthDay,
+	.flatpickr-day.notAllowed.nextMonthDay {
+		color: var(--md-sys-color-outline) !important;
+	}
+
+	.flatpickr-day.selected,
+	.flatpickr-day.startRange,
+	.flatpickr-day.endRange,
+	.flatpickr-day.selected.inRange,
+	.flatpickr-day.startRange.inRange,
+	.flatpickr-day.endRange.inRange,
+	.flatpickr-day.selected:focus,
+	.flatpickr-day.startRange:focus,
+	.flatpickr-day.endRange:focus,
+	.flatpickr-day.selected:hover,
+	.flatpickr-day.startRange:hover,
+	.flatpickr-day.endRange:hover,
+	.flatpickr-day.selected.prevMonthDay,
+	.flatpickr-day.startRange.prevMonthDay,
+	.flatpickr-day.endRange.prevMonthDay,
+	.flatpickr-day.selected.nextMonthDay,
+	.flatpickr-day.startRange.nextMonthDay,
+	.flatpickr-day.endRange.nextMonthDay {
+		background-color: var(--md-sys-color-primary);
+		border-color: var(--md-sys-color-primary);
+		color: var(--md-sys-color-on-primary) !important;
+	}
+
+	.flatpickr-day.inRange,
+	.flatpickr-day.prevMonthDay.inRange,
+	.flatpickr-day.nextMonthDay.inRange,
+	.flatpickr-day.today.inRange,
+	.flatpickr-day.prevMonthDay.today.inRange,
+	.flatpickr-day.nextMonthDay.today.inRange,
+	.flatpickr-day:hover,
+	.flatpickr-day.prevMonthDay:hover,
+	.flatpickr-day.nextMonthDay:hover,
+	.flatpickr-day:focus,
+	.flatpickr-day.prevMonthDay:focus,
+	.flatpickr-day.nextMonthDay:focus {
+		background-color: var(--md-sys-color-primary-fixed-dim);
+		border-color: var(--md-sys-color-primary-fixed-dim);
+		color: var(--md-sys-color-on-primary) !important;
+		box-shadow: none;
+		-webkit-box-shadow: none;
+	}
+
+	.flatpickr-day.today {
+		border-color: var(--md-sys-color-primary-fixed-dim);
+	}
+
+	.flatpickr-innerContainer {
+		height: 100%;
+	}
+
+	.flatpickr-weekdays {
+		height: 10%;
+	}
+
+	.flatpickr-days {
+		height: 90%;
+	}
+
+	.flatpickr-calendar,
+	.flatpickr-weekdays,
+	.flatpickr-rContainer,
+	.flatpickr-days,
+	.dayContainer {
+		width: 100%;
+		max-width: initial;
+		min-width: initial;
+	}
+
+	.flatpickr-day {
+		height: 100%;
+		max-width: initial;
+		min-height: initial;
+		max-height: initial;
+		line-height: 150%;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.dayContainer {
+		height: calc(100% / 6);
+	}
+
+	.flatpickr-months .flatpickr-prev-month,
+	.flatpickr-months .flatpickr-next-month {
+		padding: 5px;
+	}
+
+	.flatpickr-current-month {
+		font-size: 100%;
+		line-height: inherit;
+		font-weight: 300;
+		color: inherit;
+		position: static;
+		width: 75%;
+		left: 12.5%;
+		padding: 0;
+		line-height: 1;
+		height: 34px;
+		display: inline-flex;
+		text-align: center;
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+		align-items: center;
+	}
+
+	.flatpickr-current-month .flatpickr-monthDropdown-months {
+		padding: 0;
+	}
+
+	.flatpickr-monthDropdown-months option {
+		color: var(--md-sys-color-shadow) !important;
+	}
+	/************** PopUp Styles **************/
+
+	.popup-container {
+		width: 60%;
+		position: fixed;
+		opacity: 0.2;
+		bottom: -30%;
+		left: 50%;
+		transform: translate(-50%);
+		z-index: 50;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		animation: fadeIn 1s forwards;
+	}
+
+	.base-notif,
+	.red-notif {
+		display: flex;
+		border-radius: var(--md-sys-shape-corner-medium);
+		gap: 2vh;
+		border-left: 0.5vh solid var(--md-sys-color-primary);
+		color: var(--md-sys-color-on-background);
+		padding: 2%;
+		background-color: var(--md-sys-color-background);
+		box-shadow: 0.25vh 0.25vh 0.5vh var(--md-sys-color-shadow);
+	}
+
+	.red-notif {
+		border-left: 0.5vh solid var(--md-sys-color-error);
+		background-color: var(--md-sys-color-error-container);
+	}
+
+	.red-notif #title-popup {
+		color: var(--md-sys-color-error);
+	}
+
+	.red-notif #title-popup span {
+		color: var(--md-sys-color-error);
+	}
+
+	.red-notif div:last-of-type,
+	.base-notif div:last-of-type {
+		font-size: 80%;
+		font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+	}
+	.popup-container md-outlined-button {
+		margin-top: 3%;
+		--md-outlined-button-outline-color: var(--md-sys-color-error);
+		--md-outlined-button-label-text-color: var(--md-sys-color-error);
+	}
+
+	#title-popup {
+		white-space: nowrap;
+		width: 100%;
+		display: inline-flex;
+		align-items: center;
+		font-weight: 600;
+		font-size: 1rem;
+		margin-bottom: 1%;
+	}
+
+	#title-popup span {
+		margin-right: 1%;
+	}
+
+	/* Calendar Styles */
+	#listOfHours {
+		display: flex;
+		flex-direction: column;
+	}
+
+	#listOfHours span {
+		height: 40vh;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+
+	#content-calendar {
+		position: relative;
+		display: flex;
+		width: 100%;
+
+		--heightHours: 5vh;
+		--halfHeightHours: calc(var(--heightHours) / 2);
+		--widthColumns: calc(100% / 7);
+	}
+
+	.calendar-columns {
+		width: var(--widthColumns);
+		height: calc(100% + var(--halfHeightHours));
+		display: flex;
+		flex-direction: column;
+		border-right: var(--md-sys-color-surface-container-highest) 1px solid;
+	}
+
+	#calendar-special-column {
+		margin-top: calc(var(--heightHours) + var(--halfHeightHours));
+		width: calc(var(--widthColumns) / 8);
+	}
+
+	.calendar-line {
+		display: block;
+		height: var(--heightHours);
+		width: 100%;
+	}
+
+	.calendar-line::after {
+		content: '';
+		border-bottom: var(--md-sys-color-surface-container-highest) 1px solid;
+		position: absolute;
+		width: 99.5%;
+		left: 0.5%;
+		margin-top: -1px;
+		z-index: 1;
+		pointer-events: none;
+	}
+	/* DOIT ETRE DE LA HAUTEUR DE calendar-columns-header */
+	#regulateHeightHours {
+		height: var(--heightHours);
+	}
+
+	.calendar-columns-header {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		background-color: var(--md-sys-color-surface);
+		height: calc(var(--heightHours) + var(--halfHeightHours));
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		text-align: center;
+		font-size: 90%;
+	}
+
+	.calendar-columns-header::after {
+		content: '';
+		border-right: var(--md-sys-color-surface-container-highest) 1px solid;
+		border-bottom: var(--md-sys-color-surface-container-highest) 1px solid;
+		position: absolute;
+		width: 100%;
+		left: 0;
+		bottom: 0;
+	}
+
+	.calendar-columns-content {
+		display: flex;
+		flex-direction: column;
+		position: relative;
+	}
+
+	/************************************ EVENT STYLES ************************************/
+
+	.calendar-event-container {
+		width: var(--widthColumns);
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-start;
+	}
+
+	.calendar-event {
+		z-index: 1;
+		width: 100%;
+		height: var(--heightHours);
+		transition: all 0.25s;
+		overflow: hidden;
+		white-space: nowrap;
+		display: flex;
+		cursor: pointer;
+	}
+
+	.calendar-event:hover {
+		z-index: 20 !important;
+		transform: scale(1.025);
+	}
+
+	.calendar-event:hover .calendar-event-content {
+		background-color: var(--md-sys-color-primary-fixed);
+	}
+
+	.calendar-event-content {
+		font-weight: 500;
+		font-size: 13px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		background-color: transparent;
+		padding: min(3%, 0.5vh);
+		margin: 0.1vh;
+		color: var(--md-sys-color-on-primary);
+		background-color: var(--md-sys-color-primary);
+		border-radius: var(--md-sys-shape-corner-small);
+		border: 1px solid var(--md-sys-color-outline);
+		height: -moz-available;
+		height: -webkit-fill-available;
+		width: -moz-available;
+		width: -webkit-fill-available;
+	}
+
+	.calendar-event-content div {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-weight: 400;
+	}
+
+	/*************************** COLOR OF EVENT **********************/
+
+	.calendar-event[data-statut='Confirmé'] .calendar-event-content {
+		background-color: var(--color-green);
+		color: var(--md-sys-color-surface);
+		border: 1px solid var(--color-green-outline);
+	}
+
+	.calendar-event[data-statut='Annulé'] .calendar-event-content {
+		background-color: var(--color-red);
+		color: var(--md-sys-color-surface);
+		border: 1px solid var(--color-red-outline);
+	}
+
+	.calendar-event[data-statut='Option'] .calendar-event-content {
+		background-color: var(--color-orange);
+		color: var(--md-sys-color-surface);
+		border: 1px solid var(--color-orange-outline);
+	}
+
+	.calendar-event[data-statut='Réservé Sco'] .calendar-event-content {
+		background-color: var(--color-violet);
+		color: var(--md-sys-color-surface);
+		border: 1px solid var(--color-violet-outline);
+	}
+
+	/**************************** RIGHT MENU ****************************/
+
+	#content-tab[role='tabpanel'],
+	#settings-tab[role='tabpanel'] {
+		display: flex;
+		flex-direction: column;
+		gap: 1vh;
+	}
+
+	#what-see-event-checkbox-list,
+	#color-event-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1vh;
+		height: 0;
+		overflow: hidden;
+		transition: all 0.25s;
+		margin-top: 0%;
+		font-size: 80%;
+
+		border-radius: var(--md-sys-shape-corner-small);
+	}
+
+	@supports (scrollbar-color: auto) {
+		#what-see-event-checkbox-list,
+		#color-event-list {
+			scrollbar-color: var(--md-sys-color-primary) var(--md-sys-color-surface-container);
+			scrollbar-width: thin;
+			scrollbar-track-color: var(--md-sys-color-surface);
+			scrollbar-gutter: stable;
+		}
+	}
+
+	#what-see-event-checkbox-list label,
+	#color-event-list label {
+		display: inline-flex;
+		gap: 1vw;
+		align-items: center;
+		font-size: 100%;
+	}
+
+	#what-see-event-checkbox-list .titleList {
+		font-weight: 600;
+		display: inline-flex;
+		background-color: var(--md-sys-color-secondary);
+		color: var(--md-sys-color-on-primary);
+		padding: 5%0;
+		border-radius: var(--md-sys-shape-corner-small);
+		justify-content: center;
+		align-items: center;
+		font-size: 100%;
+	}
+
+	#what-see-event-checkbox-list[data-open='true'],
+	#color-event-list[data-open='true'] {
+		height: 20vh;
+		margin-top: 1%;
+		overflow: auto;
+		padding: 1%;
+		border: 1px solid var(--md-sys-color-outline);
+	}
+
+	#what-see-event-checkbox-list #input {
+		position: initial;
+	}
+
+	#color-event-list label input {
+		width: 2vw;
+	}
+
+	/*************************** LEFT MENU ***************************/
+
+	#listeReseaux-menu {
+		display: flex;
+		flex-direction: column;
+		gap: 1vh;
+		height: 100%;
+		padding: 2%;
+		overflow-y: scroll;
+		font-size: 80%;
+		border-radius: var(--md-sys-shape-corner-small);
+		border: 1px solid var(--md-sys-color-outline);
+	}
+
+	@supports (scrollbar-color: auto) {
+		#listeReseaux-menu {
+			scrollbar-color: var(--md-sys-color-primary) var(--md-sys-color-surface-container);
+			scrollbar-width: thin;
+			scrollbar-track-color: var(--md-sys-color-surface);
+			scrollbar-gutter: stable;
+		}
+	}
+
+	#listeReseaux-menu label {
+		display: inline-flex;
+		gap: 0.25vw;
+		align-items: center;
+		font-size: 100%;
+	}
+</style>
