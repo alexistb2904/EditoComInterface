@@ -1,0 +1,34 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Google Apps Script
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Install Clasp
+      run: npm install -g @google/clasp
+
+    - name: Authenticate Clasp
+      env:
+        CLASP_CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+        CLASP_CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+        CLASP_REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+      run: |
+        echo '{"token": {"access_token": "", "refresh_token": "'"$CLASP_REFRESH_TOKEN"'", "scope": "https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/drive.file", "token_type": "Bearer", "expiry_date": 0}, "oauth2ClientSettings": {"clientId": "'"$CLASP_CLIENT_ID"'", "clientSecret": "'"$CLASP_CLIENT_SECRET"'"}, "isLocalCreds": false}' > ~/.clasprc.json
+
+    - name: Push to Google Apps Script
+      run: clasp push
