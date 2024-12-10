@@ -1,72 +1,39 @@
 const sheetID = '1ttflCuSrJfONsgaH9TDvGqAYyiBT2kq7GikNi918vJc';
+//const sheetID = '1nIwdR3CsE2N_XoucNk65-84ZFlvIwZJY-plv1XEjY3k';
 
 const colonneMin = 'A';
 const colonneMax = 'AE';
 
 // Emplacement Programmation
-const COL_CONFIRMATION = 0;
-const COL_DATE = 1;
-const COL_HORAIRE_DEB = 2;
-const COL_HORAIRE_FIN = 3;
-const COL_LIEU = 4;
-const COL_TITRE = 5;
+const COL_SEMAINE = 0;
+const COL_RESEAU = 1;
+const COL_DATE = 2;
+const COL_HEURE_PUBLICATION = 3;
+const COL_TITRE = 4;
+const COL_DATE_EVENT = 5;
 const COL_TYPE = 6;
-const COL_AGENDA = 7;
-const COL_PUBLIC_CIBLE = 8;
-const COL_TYPE_STRUCTURE = 9;
-const COL_NOM_STRUCTURE = 10;
-const COL_RESUME = 11;
-const COL_THEMATIQUE = 12;
-const COL_THEMATIQUE_2 = 13;
-const COL_EFFECTIFS = 14;
-const COL_LOGISTIQUE = 15;
-const COL_STATIQUE = 16;
-const COL_CAPTATION = 17;
-const COL_PRESENTATION_ADC = 18;
-const CONVENTION_MISE_DISPO = 19;
-const COL_ETAT_CONVENTION = 20;
-const COL_REF_ADC = 21;
-const COL_INFO_CONTACT_EXT = 22;
-const COL_MAIL_EXT = 23;
-const COL_TEL_EXT = 24;
-const COL_GOOGLE_AGENDA = 25;
-const COL_AGENDA_ID = 26;
+const COL_ETAT_CREA = 7;
+const COL_ETAT_EDITO = 8;
+const COL_ETAT_MINIA = 9;
+const COL_PRECISION = 10;
+const COL_ITEMS = 11;
+const COL_COUV_S1 = 12;
+const COL_COUV_NONFOLLOW_S1_POURCENT = 13;
+const COL_COUV_NONFOLLOW_S1_NB = 14;
+const COL_LIKE_S1 = 15;
+const COL_COMMENT_S1 = 16;
+const COL_PARTAGE_S1 = 17;
+const COL_ENREGISTREMENT = 18;
+const COL_TOTAL_INTERACTION = 19;
+const COL_ABONNE_EN_PLUS = 20;
+const COL_VUE_MOY = 21;
+const COL_CLIC_LIEN = 22;
+const COL_ENGAGEMENT_S1 = 23;
+const COL_REMARQUES = 24;
+const COL_OLD_OBJECTIFS = 25;
+const COL_OLD_PILLIERS_EDITO = 26;
+
 const COL_ID = 27;
-const COL_LASTEDIT = 28;
-const COL_LASTEDITOR = 29;
-const COL_FOLDERURL = 30;
-
-const COL_ID_LETTER = 'AB';
-
-// Emplacement Médiation
-const MED_COL_CONFIRMATION = 0;
-const MED_COL_DATE = 1;
-const MED_COL_HORAIRE_DEB = 2;
-const MED_COL_HORAIRE_FIN = 3;
-const MED_COL_LIEU = 4;
-const MED_COL_TYPE_MODULE = 5;
-const MED_COL_DETAIL = 6;
-const MED_COL_TYPE_PUBLIC = 7;
-const MED_COL_EFFECTIFS = 8;
-const MED_COL_LOGISTIQUE = 9;
-const MED_COL_MEDIATION = 10;
-const MED_NOM_ECOLE = 11;
-const MED_CODE_POSTAL = 12;
-const MED_NIVEAU_ETAB = 13;
-const MED_NIVEAU_GROUPE = 14;
-const MED_EDU_PRIO = 15;
-const MED_EDU_PRECISION = 16;
-const MED_COL_REF_ADC = 17;
-const MED_COL_INFO_CONTACT_EXT = 18;
-const MED_COL_MAIL_EXT = 19;
-const MED_COL_TEL_EXT = 20;
-const MED_COL_AJOUTE = 21;
-const MED_COL_ID = 22;
-const MED_COL_LAST_EDIT = 24;
-const MED_COL_LAST_EDITOR = 25;
-const MED_COL_FOLDERURL = 26;
-
-const MED_COL_ID_LETTER = 'W';
 
 let materialInAcademie = [
 	{ name: 'Armoire Électrique Portative', amount: 1 },

@@ -26,6 +26,9 @@
 <body>
 	<div id="main">
 		<div id="menu-left">
+			<md-icon-button id="icon-retractable-menu-left">
+				<md-icon>keyboard_arrow_left</md-icon>
+			</md-icon-button>
 			<div>
 				<div id="menuDatePicker"></div>
 			</div>
@@ -33,33 +36,48 @@
 				<md-filled-button id="create-event-button" class="width-100" has-icon="true" aria-label="Permet d'ajouter un événement.">
 					<md-icon slot="icon">add</md-icon>Créer</md-filled-button
 				>
-				<md-menu id="create-event-list" anchor="create-event-button" anchor-corner="start-end">
+				<!--<md-menu id="create-event-list" anchor="create-event-button" anchor-corner="start-end">
 					<md-menu-item>
 						<div slot="headline">Programmation</div>
 					</md-menu-item>
 					<md-menu-item>
 						<div slot="headline">Médiation</div>
 					</md-menu-item>
-				</md-menu>
+				</md-menu>-->
 			</span>
 			<md-outlined-button class="width-100" has-icon="true" id="search-button"><md-icon slot="icon">search</md-icon>Rechercher</md-outlined-button>
-			<md-outlined-button class="width-100 viewModeBtn selected" has-icon="true" id="day-button" data-view="day" data-selected="false"
+			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="day-button" data-view="day" data-selected="false"
 				><md-icon slot="icon">calendar_view_day</md-icon>Vue Jour</md-outlined-button
 			>
-			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="week-button" data-view="week" data-selected="true"
+			<md-outlined-button class="width-100 viewModeBtn selected" has-icon="true" id="week-button" data-view="week" data-selected="true"
 				><md-icon slot="icon">calendar_view_week</md-icon>Vue Semaine</md-outlined-button
 			>
-			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="month-button" data-selected="false"
+			<md-outlined-button class="width-100 viewModeBtn" has-icon="true" id="month-button" data-view="month" data-selected="false"
 				><md-icon slot="icon">calendar_view_month</md-icon>Vue Mensuelle</md-outlined-button
 			>
 			<div id="listeReseaux-menu"></div>
 		</div>
 		<div id="content">
-			<div id="listOfHours">
-				<span id="regulateHeightHours"></span>
-			</div>
 			<div id="content-calendar" widthColumns="40">
 				<div id="calendar-special-column"></div>
+			</div>
+			<div id="dateStr">
+				<div id="dateStr-container">
+					<div id="dateStr-actions">
+						<div id="dataStr-back">
+							<md-icon-button id="navigation-previous">
+								<md-icon>keyboard_arrow_left</md-icon>
+							</md-icon-button>
+						</div>
+						<div id="dataStr-content"></div>
+						<div id="dataStr-next">
+							<md-icon-button id="navigation-next">
+								<md-icon>keyboard_arrow_right</md-icon>
+							</md-icon-button>
+						</div>
+					</div>
+					<div id="dateStr-info"></div>
+				</div>
 			</div>
 		</div>
 		<div id="menu-right">
@@ -67,7 +85,10 @@
 				<md-primary-tab id="content-tab" aria-controls="content-panel"><md-icon slot="icon">toc</md-icon>Contenu</md-primary-tab>
 				<md-primary-tab id="settings-tab" aria-controls="settings-panel"><md-icon slot="icon">settings</md-icon>Paramètres</md-primary-tab>
 			</md-tabs>
-			<div id="content-tab" role="tabpanel" aria-labelledby="content-tab">Photo</div>
+			<div id="content-tab" role="tabpanel" aria-labelledby="content-tab">
+				<div id="event-badges"></div>
+				<div id="event-fields"></div>
+			</div>
 			<div id="settings-tab" role="tabpanel" aria-labelledby="settings-tab" hidden>
 				<md-filled-button id="change-theme-button" class="width-100" has-icon="true" aria-label="Change le Thème">
 					<md-icon slot="icon">palette</md-icon>Changer le Thème</md-filled-button
@@ -84,6 +105,43 @@
 						<md-icon slot="icon">format_paint</md-icon>Couleurs des reseaux</md-filled-button
 					>
 					<div id="color-event-list" data-open="false"></div>
+				</div>
+				<!--<div id="order-event-container">
+					<md-filled-button id="order-event-button" class="width-100" has-icon="true" aria-label="Changer l'ordre des reseaux">
+						<md-icon slot="icon">format_paint</md-icon>Ordre des reseaux</md-filled-button
+					>
+					<div id="order-event-list" data-open="false"></div>
+				</div>-->
+				<div id="switch-list-container">
+					<label class="row-label" id="keep-viewMode-preference" title="Au chargement de la page faut-il que l'application retourne sur la dernière vue enregistrée.">
+						Garder la dernière vue
+						<md-switch
+							icons
+							show-only-selected-icon
+							aria-label="Au chargement de la page faut-il que l'application retourne sur la dernière vue enregistrée."></md-switch>
+					</label>
+					<label class="row-label" id="keep-selectedDate-preference" title="Au chargement de la page faut-il que l'application retourne sur le dernier jour sélectionné.">
+						Garder le jour sélectionné
+						<md-switch
+							icons
+							show-only-selected-icon
+							aria-label="Au chargement de la page faut-il que l'application retourne sur le dernier jour sélectionné."></md-switch>
+					</label>
+					<label class="row-label" id="leftMenu-closable-preference" title="Rendre le menu de gauche rétractable">
+						Menu de gauche rétractable
+						<md-switch icons show-only-selected-icon aria-label="Rendre le menu de gauche rétractable"></md-switch>
+					</label>
+					<label class="column-label" id="widthLeftMenu-preference">
+						Taille menu de gauche
+						<md-slider min="1" max="5" step="0.5" value="1" aria-label="Taille du menu de gauche"></md-slider>
+					</label>
+					<label class="column-label" id="widthRightMenu-preference">
+						Taille menu de droite
+						<md-slider min="1" max="5" step="0.5" value="2" aria-label="Taille du menu de droite"></md-slider>
+					</label>
+					<label class="row-label" id="numberOfColumnSameTime-preference" title="Nombre de colonne à afficher au maximum sur l'écran">
+						<md-filled-text-field class="width-100" label="Nombre de colonnes à afficher" type="number" value="7" min="1" max="7"> </md-filled-text-field>
+					</label>
 				</div>
 			</div>
 		</div>

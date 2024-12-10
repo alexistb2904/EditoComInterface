@@ -1,1130 +1,2349 @@
 <script>
-	/*********************************************************************************************************/
-
-	/*********************************************************************************************************/
-	/***************************************** BD IndexedDB ******************************************/
-	const DB = (() => {
-		// Open or create the database with multiple stores
-		const openDB = (dbName, storeNames, version = 1) => {
-			return new Promise((resolve, reject) => {
-				const request = indexedDB.open(dbName, version);
-
-				request.onupgradeneeded = (event) => {
-					const db = event.target.result;
-
-					// Create multiple object stores if they don't exist
-					storeNames.forEach((storeName) => {
-						if (!db.objectStoreNames.contains(storeName)) {
-							db.createObjectStore(storeName, { keyPath: 'id' });
-						}
-					});
-				};
-
-				request.onsuccess = (event) => {
-					resolve(event.target.result);
-				};
-
-				request.onerror = (event) => {
-					reject(`IndexedDB error: ${event.target.errorCode}`);
-				};
-			});
-		};
-
-		// Add or update an item in a specific store
-		const saveItem = async (dbName, storeName, data) => {
-			const db = await openDB(dbName, [storeName]);
-			return new Promise((resolve, reject) => {
-				const transaction = db.transaction(storeName, 'readwrite');
-				const store = transaction.objectStore(storeName);
-				const request = store.put(data);
-
-				request.onsuccess = () => resolve(true);
-				request.onerror = (event) => reject(`Save failed: ${event.target.errorCode}`);
-			});
-		};
-
-		// Get a single item by key from a specific store
-		const getItem = async (dbName, storeName, key) => {
-			const db = await openDB(dbName, [storeName]);
-			return new Promise((resolve, reject) => {
-				const transaction = db.transaction(storeName, 'readonly');
-				const store = transaction.objectStore(storeName);
-				const request = store.get(key);
-
-				request.onsuccess = () => resolve(request.result);
-				request.onerror = (event) => reject(`Get failed: ${event.target.errorCode}`);
-			});
-		};
-
-		// Get all items from a specific store
-		const getAllItems = async (dbName, storeName) => {
-			const db = await openDB(dbName, [storeName]);
-			return new Promise((resolve, reject) => {
-				const transaction = db.transaction(storeName, 'readonly');
-				const store = transaction.objectStore(storeName);
-				const request = store.getAll();
-
-				request.onsuccess = () => resolve(request.result);
-				request.onerror = (event) => reject(`Get all failed: ${event.target.errorCode}`);
-			});
-		};
-
-		// Delete an item by key from a specific store
-		const deleteItem = async (dbName, storeName, key) => {
-			const db = await openDB(dbName, [storeName]);
-			return new Promise((resolve, reject) => {
-				const transaction = db.transaction(storeName, 'readwrite');
-				const store = transaction.objectStore(storeName);
-				const request = store.delete(key);
-
-				request.onsuccess = () => resolve(true);
-				request.onerror = (event) => reject(`Delete failed: ${event.target.errorCode}`);
-			});
-		};
-
-		// Clear all items from a specific store
-		const clearStore = async (dbName, storeName) => {
-			const db = await openDB(dbName, [storeName]);
-			return new Promise((resolve, reject) => {
-				const transaction = db.transaction(storeName, 'readwrite');
-				const store = transaction.objectStore(storeName);
-				const request = store.clear();
-
-				request.onsuccess = () => resolve(true);
-				request.onerror = (event) => reject(`Clear failed: ${event.target.errorCode}`);
-			});
-		};
-
-		return {
-			openDB,
-			saveItem,
-			getItem,
-			getAllItems,
-			deleteItem,
-			clearStore,
-		};
-	})();
-
-	/*********************************************************************************************************/
-	/*
-		/*										   VARIABLES GLOBALES
-		/*
-		/*********************************************************************************************************/
 	(async () => {
+		/*********************************************************************************************************/
+
+		/*********************************************************************************************************/
+		/***************************************** BD IndexedDB ******************************************/
+		const DB = (() => {
+			// Open or create the database with multiple stores
+			const openDB = (dbName, storeNames, version = 1) => {
+				return new Promise((resolve, reject) => {
+					let currentVersion = version;
+
+					const request = indexedDB.open(dbName);
+
+					request.onsuccess = (event) => {
+						const db = event.target.result;
+						const existingStores = Array.from(db.objectStoreNames);
+
+						// Vérifie si de nouveaux stores sont nécessaires
+						const newStores = storeNames.filter((storeName) => !existingStores.includes(storeName));
+
+						if (newStores.length > 0) {
+							db.close(); // Ferme la connexion avant de modifier la version
+							currentVersion = db.version + 1; // Augmente la version
+							const upgradeRequest = indexedDB.open(dbName, currentVersion);
+
+							upgradeRequest.onupgradeneeded = (upgradeEvent) => {
+								const upgradeDB = upgradeEvent.target.result;
+								newStores.forEach((storeName) => {
+									if (!upgradeDB.objectStoreNames.contains(storeName)) {
+										upgradeDB.createObjectStore(storeName, { keyPath: 'id' });
+									}
+								});
+							};
+
+							upgradeRequest.onsuccess = (upgradeEvent) => {
+								resolve(upgradeEvent.target.result);
+							};
+
+							upgradeRequest.onerror = (upgradeEvent) => {
+								reject(`IndexedDB upgrade error: ${upgradeEvent.target.errorCode}`);
+							};
+						} else {
+							resolve(db); // Pas besoin de nouveaux stores
+						}
+					};
+
+					request.onerror = (event) => {
+						reject(`IndexedDB error: ${event.target.errorCode}`);
+					};
+
+					request.onupgradeneeded = (event) => {
+						const db = event.target.result;
+						storeNames.forEach((storeName) => {
+							if (!db.objectStoreNames.contains(storeName)) {
+								db.createObjectStore(storeName, { keyPath: 'id' });
+							}
+						});
+					};
+				});
+			};
+
+			const getListStore = async (dbName) => {
+				const db = await openDB(dbName, []);
+				return db.objectStoreNames;
+			};
+
+			// Add or update an item in a specific store
+			const saveItem = async (dbName, storeName, data) => {
+				const db = await openDB(dbName, [storeName]);
+				return new Promise((resolve, reject) => {
+					const transaction = db.transaction(storeName, 'readwrite');
+					const store = transaction.objectStore(storeName);
+					const request = store.put(data);
+
+					request.onsuccess = () => resolve(true);
+					request.onerror = (event) => reject(`Save failed: ${event.target.errorCode}`);
+				});
+			};
+
+			// Get a single item by key from a specific store
+			const getItem = async (dbName, storeName, key) => {
+				const db = await openDB(dbName, [storeName]);
+				return new Promise((resolve, reject) => {
+					const transaction = db.transaction(storeName, 'readonly');
+					const store = transaction.objectStore(storeName);
+					const request = store.get(key);
+
+					request.onsuccess = () => {
+						if (request.result && key === 'listCategories') {
+							resolve(request.result);
+						} else {
+							resolve(request.result);
+						}
+					};
+
+					request.onerror = (event) => reject(`Get failed: ${event.target.errorCode}`);
+				});
+			};
+
+			// Get all items from a specific store
+			const getAllItems = async (dbName, storeName) => {
+				const db = await openDB(dbName, [storeName]);
+				return new Promise((resolve, reject) => {
+					const transaction = db.transaction(storeName, 'readonly');
+					const store = transaction.objectStore(storeName);
+					const request = store.getAll();
+
+					request.onsuccess = () => resolve(request.result);
+					request.onerror = (event) => reject(`Get all failed: ${event.target.errorCode}`);
+				});
+			};
+
+			// Delete an item by key from a specific store
+			const deleteItem = async (dbName, storeName, key) => {
+				const db = await openDB(dbName, [storeName]);
+				return new Promise((resolve, reject) => {
+					const transaction = db.transaction(storeName, 'readwrite');
+					const store = transaction.objectStore(storeName);
+					const request = store.delete(key);
+
+					request.onsuccess = () => resolve(true);
+					request.onerror = (event) => reject(`Delete failed: ${event.target.errorCode}`);
+				});
+			};
+
+			// Clear all items from a specific store
+			const clearStore = async (dbName, storeName) => {
+				const db = await openDB(dbName, [storeName]);
+				return new Promise((resolve, reject) => {
+					const transaction = db.transaction(storeName, 'readwrite');
+					const store = transaction.objectStore(storeName);
+					const request = store.clear();
+
+					request.onsuccess = () => resolve(true);
+					request.onerror = (event) => reject(`Clear failed: ${event.target.errorCode}`);
+				});
+			};
+
+			return {
+				openDB,
+				getListStore,
+				saveItem,
+				getItem,
+				getAllItems,
+				deleteItem,
+				clearStore,
+			};
+		})();
+
+		/*********************************************************************************************************/
+		/*
+			/*										   VARIABLES GLOBALES
+			/*
+			/*********************************************************************************************************/
+
 		const dbName = 'AgendaCom';
 		const storeNames = ['Events', 'Preferences', 'Logs', 'Variables'];
 		await DB.openDB(dbName, storeNames);
-	})();
-
-	const contentCalendar = document.querySelector('#content-calendar');
-
-	let viewMode = 'week';
-
-	let selectedDate = '';
-	let [firstDayOfWeek, lastDayOfWeek] = [];
-
-	/***************************************** Initialisation ***********************************************/
-
-	let flatDatePicker = '';
-	function changePickerDate(date, instance = flatDatePicker) {
-		if (instance != '') {
-			instance.setDate(date);
-		}
-	}
-
-	flatDatePicker = flatpickr('#menuDatePicker', {
-		inline: true,
-		defaultDate: selectedDate,
-		locale: {
-			firstDayOfWeek: 1,
-
-			weekdays: {
-				shorthand: ['D', 'L', 'M', 'M', 'J', 'J', 'S'],
-				longhand: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'],
-			},
-
-			months: {
-				shorthand: ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'],
-				longhand: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
-			},
-
-			ordinal: (nth) => {
-				if (nth > 1) return '';
-
-				return 'er';
-			},
-			rangeSeparator: ' au ',
-			weekAbbreviation: 'Sem',
-			scrollTitle: 'Défiler pour augmenter la valeur',
-			toggleTitle: 'Cliquer pour basculer',
-			time_24hr: true,
-		},
-		onReady: function (selectedDates, dateStr, instance) {
-			if (viewMode == 'week') {
-				instance.set('mode', 'range');
-				changePickerDate([firstDayOfWeek, lastDayOfWeek], instance);
-			} else {
-				instance.set('mode', 'single');
-			}
-			document.querySelectorAll('.flatpickr-monthDropdown-month').forEach((month) => {
-				month.textContent = month.textContent.charAt(0).toUpperCase() + month.textContent.slice(1);
+		// Vérifié que toutes les bases voulu existe et si ce n'est pas le cas les créer
+		if (DB.openDB) {
+			const allStores = await DB.getListStore(dbName);
+			await storeNames.forEach(async (storeName) => {
+				if (!allStores.contains(storeName)) {
+					console.warn('Création de la base de données : ', storeName);
+					await DB.openDB(dbName, [storeName]);
+				}
 			});
-		},
-		onDayCreate: function (dObj, dStr, fp, dayElem) {},
-		onChange: function (selectedDates, dateStr, instance) {
-			updateDaysSelected(selectedDates[0]);
-		},
-	});
-
-	checkReseaux();
-
-	updateDaysSelected(new Date());
-
-	DB.getItem('AgendaCom', 'Preferences', 'darkMode').then((result) => {
-		if (result) {
-			document.querySelector('html').toggleAttribute('dark', result);
 		}
-	});
 
-	function addInitalKey() {
-		const keysEvent = formatEvent([], 'Event', 0, true);
+		let allPreferences = await DB.getAllItems(dbName, 'Preferences');
 
-		const keys = [...keysEvent];
-		const keysList = {};
-		keysEvent.forEach((key) => {
-			const tableau = 'Objectifs ' + new Date(selectedDate).getFullYear();
-			keysList['c_s_' + key] = { id: 'c_s_' + key, value: key, selected: false };
-			switch (key) {
-				case 'reseau':
-				case 'date':
-				case 'titre':
-				case 'type':
-					keysList['c_s_' + key].selected = true;
-					break;
-				default:
-					keysList['c_s_' + key].selected = false;
-					break;
+		const contentCalendar = document.querySelector('#content-calendar');
+		const elementToShowBtn = document.querySelector('#what-see-event-button');
+		const elementToShowList = document.querySelector('#what-see-event-checkbox-list');
+		const colorEventBtn = document.querySelector('#color-event-button');
+		const colorEventList = document.querySelector('#color-event-list');
+		let viewMode = (await isPreferenceUsed('viewMode')) || 'week';
+		let loadingTimeoutId = undefined;
+		let loadingTimeoutId2 = undefined;
+		let selectedDate = new Date((await isPreferenceUsed('selectedDate')) || new Date());
+		let monthToGet = selectedDate.toLocaleDateString('fr-FR', { month: 'long' }).replace('é', 'e').replace('è', 'e').slice(0, 3).toUpperCase();
+		let [firstDayOfWeek, lastDayOfWeek] = getFirstAndLastDayOfWeek(selectedDate);
+
+		appearLoadingSpinner();
+		await getInitialFerieAndScolaire(selectedDate);
+		killLoadingSpinner();
+
+		/***************************************** Initialisation ***********************************************/
+
+		let flatDatePicker = '';
+		function changePickerDate(date, instance = flatDatePicker) {
+			if (instance != '') {
+				instance.setDate(date);
+			}
+		}
+
+		flatDatePicker = flatpickr('#menuDatePicker', {
+			inline: true,
+			defaultDate: selectedDate,
+			locale: {
+				firstDayOfWeek: 1,
+
+				weekdays: {
+					shorthand: ['D', 'L', 'M', 'M', 'J', 'V', 'S'],
+					longhand: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'],
+				},
+
+				months: {
+					shorthand: ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'],
+					longhand: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
+				},
+
+				ordinal: (nth) => {
+					if (nth > 1) return '';
+
+					return 'er';
+				},
+				rangeSeparator: ' au ',
+				weekAbbreviation: 'Sem',
+				scrollTitle: 'Défiler pour augmenter la valeur',
+				toggleTitle: 'Cliquer pour basculer',
+				time_24hr: true,
+			},
+			onReady: function (selectedDates, dateStr, instance) {
+				// Changer le mode de sélection en fonction de la vue
+				if (viewMode == 'week') {
+					instance.set('mode', 'range');
+					changePickerDate([firstDayOfWeek, lastDayOfWeek], instance);
+				} else if (viewMode == 'day') {
+					instance.set('mode', 'single');
+				} else if (viewMode == 'month') {
+					instance.set('mode', 'range');
+					changePickerDate(
+						[new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)],
+						instance
+					);
+				}
+				// Capitaliser les mois
+				document.querySelectorAll('.flatpickr-monthDropdown-month').forEach((month) => {
+					month.textContent = month.textContent.charAt(0).toUpperCase() + month.textContent.slice(1);
+				});
+			},
+			onDayCreate: async function (dObj, dStr, fp, dayElem) {
+				// Ajout des jours fériés et scolaires
+				await checkChipsForDays(new Date(dayElem.dateObj), true).then((result) => {
+					if (result) {
+						result.forEach((chip) => {
+							if (chip.type == 'Ferie') {
+								dayElem.classList.add('calendar-chip-ferie');
+							} else if (chip.type == 'Scolaire') {
+								dayElem.classList.add('calendar-chip-scolaire');
+							} else {
+								dayElem.classList.add('calendar-chip-special');
+							}
+						});
+					}
+				});
+			},
+			onChange: function (selectedDates, dateStr, instance) {
+				updateDaysSelected(selectedDates[0]);
+			},
+		});
+
+		function addInitalKey() {
+			const keysEvent = formatEvent([], 'Event', 0, true);
+
+			const keys = [...keysEvent];
+			const keysList = {};
+			keysEvent.forEach((key) => {
+				const tableau = monthToGet + ' ' + new Date(selectedDate).getFullYear();
+				keysList['c_s_' + key] = { id: 'c_s_' + key, value: key, selected: false };
+				switch (key) {
+					// Passer les paramètres par défaut en true
+					case 'reseau':
+					case 'date':
+					case 'titre':
+					case 'type':
+						keysList['c_s_' + key].selected = true;
+						break;
+					default:
+						keysList['c_s_' + key].selected = false;
+						break;
+				}
+			});
+
+			DB.saveItem(dbName, 'Preferences', { id: 'whatToShow', value: keysList });
+		}
+
+		DB.getItem(dbName, 'Preferences', 'whatToShow').then((result) => {
+			if (!result) {
+				addInitalKey();
 			}
 		});
 
-		DB.saveItem('AgendaCom', 'Preferences', { id: 'whatToShow', value: keysList });
-	}
+		await checkCategorie();
 
-	DB.getItem('AgendaCom', 'Preferences', 'whatToShow').then((result) => {
-		if (!result) {
-			addInitalKey();
-		}
-	});
+		updateDaysSelected(selectedDate);
 
-	/***************************************** Fonctions fondamentales ***********************************************/
+		await appearCategoriesInListLeft();
+		await generateListElementToShow();
+		await generateListReseauColor();
 
-	function calendarUpdate() {
-		switch (viewMode) {
-			case 'week':
-			default:
-				createColumnsWeek();
-				break;
-			case 'day':
-				createColumnsDay();
-				break;
-		}
-		// Récupération des événements
-		const dateAtStart = getFirstAndLastDayOfWeek(selectedDate)[0];
-		retrieveEvents('Objectifs ' + new Date(selectedDate).getFullYear(), dateAtStart);
-		// Affichage des événements
-		displayEvents();
-	}
+		/***************************************** Gestion des Préférences non essentielles ***********************************************/
+		// Dark Mode
+		DB.getItem(dbName, 'Preferences', 'darkMode').then((result) => {
+			if (result) {
+				document.querySelector('html').toggleAttribute('dark', result.darkMode);
+			}
+		});
 
-	function createColumnsWeek() {
-		contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
-		const fakeFirstDayOfWeek = new Date(firstDayOfWeek);
-		const todayDate = new Date();
-		for (let i = 0; i < 7; i++) {
-			const columns = document.createElement('div');
-			let dateStr = '';
-			if (window.innerWidth <= 1250) {
-				dateStr = fakeFirstDayOfWeek.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+		// Garder la vue
+		document.querySelector('#keep-viewMode-preference md-switch').addEventListener('click', async (e) => {
+			if (e.target.selected) {
+				await DB.saveItem(dbName, 'Preferences', { id: 'viewMode', value: viewMode, used: false });
 			} else {
-				dateStr = fakeFirstDayOfWeek.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+				await DB.saveItem(dbName, 'Preferences', { id: 'viewMode', value: viewMode, used: true });
 			}
-			let styleCustom = '';
-			if (fakeFirstDayOfWeek.toLocaleDateString() == todayDate.toLocaleDateString()) {
-				styleCustom = 'style="font-weight: 700;"';
+		});
+
+		document.querySelector('#keep-viewMode-preference md-switch').selected = (await isPreferenceUsed('viewMode')) ? await isPreferenceUsed('viewMode') : false;
+
+		// Garder le jour sélectionné
+		document.querySelector('#keep-selectedDate-preference md-switch').addEventListener('click', async (e) => {
+			if (e.target.selected) {
+				await DB.saveItem(dbName, 'Preferences', { id: 'selectedDate', value: selectedDate, used: false });
+			} else {
+				await DB.saveItem(dbName, 'Preferences', { id: 'selectedDate', value: selectedDate, used: true });
 			}
-			columns.className = 'calendar-columns';
-			columns.dataset.identifier = formatDate(fakeFirstDayOfWeek);
-			columns.innerHTML = `
+		});
+
+		document.querySelector('#keep-selectedDate-preference md-switch').selected = (await isPreferenceUsed('selectedDate')) ? true : false;
+
+		// Menu de gauche rétractable
+		document.querySelector('#leftMenu-closable-preference md-switch').addEventListener('click', async () => {
+			document.querySelector('#menu-left').classList.toggle('retractable');
+			await DB.saveItem(dbName, 'Preferences', { id: 'leftMenuClosable', value: document.querySelector('#menu-left').classList.contains('retractable'), used: true });
+		});
+
+		document.querySelector('#leftMenu-closable-preference md-switch').selected = (await isPreferenceUsed('leftMenuClosable'))
+			? await isPreferenceUsed('leftMenuClosable')
+			: false;
+		document.querySelector('#menu-left').classList.toggle('retractable', document.querySelector('#leftMenu-closable-preference md-switch').selected);
+
+		document.querySelector('#icon-retractable-menu-left').addEventListener('click', () => {
+			document.querySelector('#menu-left').classList.toggle('close');
+		});
+		document.querySelector('#icon-retractable-menu-left').addEventListener('mouseenter', () => {
+			if (document.querySelector('#menu-left').classList.contains('close')) {
+				document.querySelector('#menu-left').classList.toggle('close');
+			}
+		});
+
+		// Taille menu de gauche
+		function calculTailleMenuGaucheDroite(valeurSlider, computedStyle) {
+			const multiplyBy = valeurSlider >= 2 ? parseFloat(parseFloat(valeurSlider) / 1.5) : valeurSlider;
+			//console.log(valeurSlider, computedStyle, multiplyBy);
+			return parseFloat(computedStyle) * multiplyBy + 'vw';
+		}
+		const computedWidthMenuLeft = ((parseFloat(window.getComputedStyle(document.querySelector('#menu-left')).width.replace('px', '')) / window.innerWidth) * 100).toFixed(2);
+		document.querySelector('#widthLeftMenu-preference md-slider').addEventListener('input', async (e) => {
+			document.querySelector('#menu-left').style.width = calculTailleMenuGaucheDroite(e.target.value, computedWidthMenuLeft);
+			await DB.saveItem(dbName, 'Preferences', { id: 'widthLeftMenu', value: e.target.value, used: true });
+		});
+		document.querySelector('#widthLeftMenu-preference md-slider').value = (await isPreferenceUsed('widthLeftMenu')) ? await isPreferenceUsed('widthLeftMenu') : 1;
+		document.querySelector('#menu-left').style.width = calculTailleMenuGaucheDroite(document.querySelector('#widthLeftMenu-preference md-slider').value, computedWidthMenuLeft);
+
+		// Taille menu de droite
+		const computedWidthMenuRight = ((parseFloat(window.getComputedStyle(document.querySelector('#menu-left')).width.replace('px', '')) / window.innerWidth) * 100).toFixed(2);
+		document.querySelector('#widthRightMenu-preference md-slider').addEventListener('change', async (e) => {
+			document.querySelector('#menu-right').style.width = calculTailleMenuGaucheDroite(e.target.value + 1, computedWidthMenuRight);
+			await DB.saveItem(dbName, 'Preferences', { id: 'widthRightMenu', value: e.target.value, used: true });
+		});
+
+		document.querySelector('#widthRightMenu-preference md-slider').value = (await isPreferenceUsed('widthRightMenu')) ? await isPreferenceUsed('widthRightMenu') : 1;
+		document.querySelector('#menu-right').style.width = calculTailleMenuGaucheDroite(
+			document.querySelector('#widthRightMenu-preference md-slider').value + 1,
+			computedWidthMenuRight
+		);
+
+		document.querySelectorAll('.viewModeBtn').forEach((btn) => {
+			if (btn.getAttribute('data-selected') == viewMode) {
+				btn.classList.add('selected');
+				btn.setAttribute('data-selected', true);
+			} else {
+				btn.classList.remove('selected');
+				btn.setAttribute('data-selected', false);
+			}
+		});
+
+		// Nombre de colonnes affichées en même temps
+		document.querySelector('#numberOfColumnSameTime-preference md-filled-text-field').addEventListener('change', async (e) => {
+			await DB.saveItem(dbName, 'Preferences', { id: 'numberOfColumnSameTime', value: e.target.value, used: true });
+
+			contentCalendar.style.setProperty('--widthColumns', 99 / e.target.value + '%');
+		});
+
+		document.querySelector('#numberOfColumnSameTime-preference md-filled-text-field').value = (await isPreferenceUsed('numberOfColumnSameTime'))
+			? await isPreferenceUsed('numberOfColumnSameTime')
+			: 7;
+		contentCalendar.style.setProperty('--widthColumns', 99 / document.querySelector('#numberOfColumnSameTime-preference md-filled-text-field').value + '%');
+
+		/***************************************** Fonctions fondamentales ***********************************************/
+
+		async function isPreferenceUsed(id, verifyUsed = true) {
+			allPreferences = await DB.getAllItems(dbName, 'Preferences');
+			if (verifyUsed) {
+				if (allPreferences.find((pref) => pref.id == id)?.used) {
+					return allPreferences.find((pref) => pref.id == id)?.value;
+				} else {
+					return false;
+				}
+			} else {
+				return allPreferences.find((pref) => pref.id == id)?.value;
+			}
+		}
+
+		async function getInitialFerieAndScolaire(date) {
+			const getDatesLocal = (await DB.getItem(dbName, 'Variables', 'listChipsDates'))?.value;
+			if (!getDatesLocal) {
+				try {
+					const result = await new Promise((resolve, reject) => {
+						google.script.run
+							.withSuccessHandler((result) => {
+								if (result) {
+									resolve(result);
+								} else {
+									reject(new Error('No result returned from server'));
+								}
+							})
+							.withFailureHandler((error) => reject(error))
+							.getAllFerieAndScolaire(date.getFullYear());
+					});
+					const getDates = {};
+					getDates[date.getFullYear()] = result;
+					await DB.saveItem(dbName, 'Variables', { id: 'listChipsDates', value: getDates });
+				} catch (error) {
+					errorHandler(error);
+				}
+			}
+		}
+
+		async function checkChipsForDays(day, calendarMode = false) {
+			let getDates = (await DB.getItem(dbName, 'Variables', 'listChipsDates'))?.value;
+			if (getDates) {
+				const chipsForYear = getDates[day.getFullYear()];
+				if (chipsForYear) {
+					const chipsForDayFerie = chipsForYear['joursFeries'].filter((chip) => chip.date == formatDate(day));
+					const chipsForDayScolaire = chipsForYear['joursScolaires'].filter((chip) => estDansPlageJour(formatDate(day), chip.start_date, chip.end_date));
+					let listOfChips = [];
+					if (chipsForDayFerie.length > 0) {
+						chipsForDayFerie.forEach((chip) => {
+							if (!calendarMode) {
+								const chipElement = document.createElement('div');
+								chipElement.className = 'chipEvent';
+								chipElement.classList.add('chipEventFerie');
+								chipElement.title = chip.nom;
+								chipElement.textContent = chip.nom;
+								if (listOfChips.includes(chipElement)) {
+									return;
+								}
+								listOfChips.push(chipElement);
+							} else {
+								listOfChips.push({ nom: chip.nom, type: 'Ferie' });
+							}
+						});
+					}
+					if (chipsForDayScolaire.length > 0) {
+						chipsForDayScolaire.forEach((chip) => {
+							if (!calendarMode) {
+								const chipElement = document.createElement('div');
+								chipElement.className = 'chipEvent';
+								chipElement.classList.add('chipEventScolaire');
+								chipElement.title = chip.nom;
+								chipElement.textContent = chip.nom;
+								listOfChips.push(chipElement);
+							} else {
+								listOfChips.push({ nom: chip.nom, type: 'Scolaire' });
+							}
+						});
+					}
+					return listOfChips;
+				} else {
+					google.script.run
+						.withSuccessHandler((result) => {
+							if (result) {
+								if (getDates) {
+									if (getDates[day.getFullYear()]) {
+										getDates[day.getFullYear()].push(...result);
+									} else {
+										getDates[day.getFullYear()] = result;
+									}
+									DB.saveItem(dbName, 'Variables', { id: 'listChipsDates', value: getDates });
+								} else {
+									getDates = {};
+									getDates[day.getFullYear()] = result;
+									DB.saveItem(dbName, 'Variables', { id: 'listChipsDates', value: getDates });
+								}
+							}
+						})
+						.withFailureHandler(errorHandler)
+						.getAllFerieAndScolaire(day.getFullYear());
+				}
+			} else {
+				google.script.run
+					.withSuccessHandler((result) => {
+						if (result) {
+							if (getDates) {
+								if (getDates[day.getFullYear()]) {
+									getDates[day.getFullYear()].push(...result);
+								} else {
+									getDates[day.getFullYear()] = result;
+								}
+								DB.saveItem(dbName, 'Variables', { id: 'listChipsDates', value: getDates });
+							} else {
+								getDates = {};
+								getDates[day.getFullYear()] = result;
+								DB.saveItem(dbName, 'Variables', { id: 'listChipsDates', value: getDates });
+							}
+						}
+					})
+					.withFailureHandler(errorHandler)
+					.getAllFerieAndScolaire(day.getFullYear());
+			}
+		}
+
+		async function calendarUpdate() {
+			appearLoadingSpinner();
+			// Utilisation monthToGet si forme = "DEC 2024" ou "mmm yyyy"
+			//monthToGet = selectedDate.toLocaleDateString('fr-FR', { month: 'long' }).replace('é', 'e').replace('è', 'e').slice(0, 3).toUpperCase();
+			switch (viewMode) {
+				case 'week':
+				default:
+					await createColumnsWeek();
+					break;
+				case 'day':
+					await createColumnsDay();
+					break;
+				case 'month':
+					await createColumnsMonth();
+					break;
+			}
+			// Récupération des événements
+			const dateAtStart = getFirstAndLastDayOfWeek(selectedDate)[0];
+			//await retrieveEvents(monthToGet + ' ' + new Date(selectedDate).getFullYear(), dateAtStart);
+			await retrieveEvents('Objectifs ' + new Date(selectedDate).getFullYear(), dateAtStart);
+
+			// Affichage des événements
+			displayEvents();
+			// Disparition du spinner
+			killLoadingSpinner();
+		}
+
+		async function createColumnsWeek() {
+			appearLoadingSpinner(2);
+			// Suppression des colonnes existantes et anciens paramètres
+			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
+			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#dateStr-info').innerHTML = '';
+
+			// Création des colonnes
+			const fakeFirstDayOfWeek = new Date(firstDayOfWeek);
+			const semaineNumber = getWeekNumber(selectedDate);
+			document.querySelector('#dataStr-content').textContent = 'Semaine ' + semaineNumber + ' de ' + selectedDate.getFullYear();
+			const todayDate = new Date();
+			for (let i = 0; i < 7; i++) {
+				const columns = document.createElement('div');
+				let dateStr = '';
+				dateStr = fakeFirstDayOfWeek.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+				/*
+				if (window.innerWidth <= 1250) {
+					dateStr = fakeFirstDayOfWeek.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+				} else {
+					dateStr = fakeFirstDayOfWeek.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+				}*/
+				let styleCustom = '';
+				if (fakeFirstDayOfWeek.toLocaleDateString() == todayDate.toLocaleDateString()) {
+					styleCustom = 'style="font-weight: 700;"';
+				}
+				columns.className = 'calendar-columns';
+				columns.dataset.identifier = formatDate(fakeFirstDayOfWeek);
+				columns.innerHTML = `
+						<div class="calendar-columns-header">
+								<span class="calendar-columns-header-title" ${styleCustom}>${dateStr}</span>
+								<div class="calendar-columns-header-info"></div>
+						</div>
+						<div class="calendar-columns-content"></div>`;
+				const listOfChips = await checkChipsForDays(fakeFirstDayOfWeek);
+				if (listOfChips) {
+					listOfChips.forEach((chip) => {
+						columns.querySelector('.calendar-columns-header-info').appendChild(chip);
+					});
+				}
+				fakeFirstDayOfWeek.setDate(fakeFirstDayOfWeek.getDate() + 1);
+				contentCalendar.appendChild(columns);
+			}
+			killLoadingSpinner(2);
+		}
+
+		async function createColumnsDay() {
+			appearLoadingSpinner(2);
+			// Suppression des colonnes existantes et anciens paramètres
+			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
+			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#dateStr-info').innerHTML = '';
+
+			// Création des colonnes
+			const dateStr = selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+			document.querySelector('#dataStr-content').textContent = dateStr;
+			const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
+			for (const reseau in allCategories?.value) {
+				const columns = document.createElement('div');
+				columns.className = 'calendar-columns';
+				if (allCategories?.value[reseau].show == false) {
+					columns.classList.add('inactive');
+				}
+				columns.dataset.identifier = allCategories?.value[reseau].id;
+				columns.innerHTML = `
 					<div class="calendar-columns-header">
-							<span class="calendar-columns-header-title" ${styleCustom}>${dateStr}</span>
+							<span class="calendar-columns-header-title">${allCategories?.value[reseau].id}</span>
 							<div class="calendar-columns-header-info"></div>
 					</div>
 					<div class="calendar-columns-content"></div>`;
-			fakeFirstDayOfWeek.setDate(fakeFirstDayOfWeek.getDate() + 1);
-			contentCalendar.appendChild(columns);
-		}
-	}
 
-	function updateDaysSelected(date) {
-		selectedDate = date;
-		[firstDayOfWeek, lastDayOfWeek] = getFirstAndLastDayOfWeek(selectedDate);
-		if (viewMode == 'week') {
-			flatDatePicker.set('mode', 'range');
-			changePickerDate([firstDayOfWeek, lastDayOfWeek]);
-		} else {
-			flatDatePicker.set('mode', 'single');
-		}
-		calendarUpdate();
-	}
-
-	function navigationNext() {
-		if (viewMode == 'week') {
-			selectedDate.setDate(selectedDate.getDate() + 7);
-		} else {
-			selectedDate.setDate(selectedDate.getDate() + 1);
-		}
-		updateDaysSelected(selectedDate);
-	}
-
-	function navigationPrevious() {
-		if (viewMode == 'week') {
-			selectedDate.setDate(selectedDate.getDate() - 7);
-		} else {
-			selectedDate.setDate(selectedDate.getDate() - 1);
-		}
-		updateDaysSelected(selectedDate);
-	}
-
-	function formatEvent(event, tableau, ligne, getListKeys = false) {
-		const format = {
-			id: event[COL_ID] + '_' + tableau,
-			tableau: tableau,
-			ligne: ligne,
-			reseau: event[COL_RESEAU],
-			type: event[COL_TYPE],
-			titre: event[COL_TITRE],
-			items: event[COL_ITEMS],
-			objectifs: event[COL_OBJECTIFS],
-			etatCrea: event[COL_ETAT_CREA],
-			etatEdito: event[COL_ETAT_EDITO],
-			etatPrecision: event[COL_ETAT_PRECISION],
-			date: event[COL_DATE] ? convertAbregedStringToDate(event[COL_DATE]) : '',
-		};
-		if (getListKeys) {
-			return Object.keys(format);
-		} else {
-			return format;
-		}
-	}
-
-	async function retrieveEvents(tableau = 'Event', dateAtStart, pushToDB = true) {
-		let range = '';
-		let ligneToStart = 2;
-		let lastEventUpdate = await DB.getItem('AgendaCom', 'Variables', 'lastEventUpdate');
-		if (lastEventUpdate) {
-			lastEventUpdate = lastEventUpdate['value'];
-		}
-		if (!lastEventUpdate || new Date(lastEventUpdate).getTime() < new Date().getTime() - 15000) {
-			range = tableau + '!' + colonneMin + '' + ligneToStart + ':' + colonneMax;
-			google.script.run.withSuccessHandler(eventRetrieved).withFailureHandler(errorHandler).getDataFromSpreadsheet(range, 'base');
-
-			await DB.saveItem('AgendaCom', 'Variables', { id: 'lastEventUpdate', value: new Date() });
-		} else {
-			console.log(
-				'Récupération des événements déjà effectuée il y a moins de 15 secondes (' + Math.abs((new Date(lastEventUpdate).getTime() - new Date().getTime()) / 1000) + ')'
-			);
-		}
-
-		async function eventRetrieved(events) {
-			console.log('Récupération des événements : ', events);
-			if (!comparerObjets(dateAtStart, getFirstAndLastDayOfWeek(selectedDate)[0])) {
-				console.log('Dates de la semaine changées');
-				return;
+				contentCalendar.appendChild(columns);
 			}
-			let missingKey = [];
-			console.groupCollapsed('Récupération des événements ' + tableau);
-			let ligne = ligneToStart;
-			let eventsJSON = {};
-			events.forEach(async (event) => {
-				ligne += 1;
-				if (event[0] != '') {
-					if (!event[COL_ID]) {
-						missingKey.push("Clé primaire manquante pour l'événement ligne " + (ligne - 1) + ' dans ' + tableau + ' : ', event);
-					} else {
-						const formatedEvent = await formatEvent(event, tableau, ligne - 1);
-						eventsJSON[event[COL_ID] + '_' + tableau] = formatedEvent;
-					}
+			const listOfChips = await checkChipsForDays(selectedDate);
+
+			if (listOfChips) {
+				listOfChips.forEach((chip) => {
+					document.querySelector('#dateStr-info').appendChild(chip);
+				});
+			}
+			killLoadingSpinner(2);
+		}
+
+		async function createColumnsMonth() {
+			appearLoadingSpinner(2);
+			// Suppression des colonnes existantes et anciens paramètres
+			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
+			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#dateStr-info').innerHTML = '';
+
+			// Création des colonnes
+			const monthDiv = document.createElement('div');
+			monthDiv.className = 'calendar-month';
+			const monthStr = selectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+			document.querySelector('#dataStr-content').textContent = monthStr;
+			const todayDate = new Date();
+			const fakeDay = new Date(selectedDate);
+			fakeDay.setDate(1);
+			const numberOfDays = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+			for (let i = 1; i <= numberOfDays; i++) {
+				const columns = document.createElement('div');
+				columns.className = 'calendar-columns';
+				columns.dataset.identifier = formatDate(fakeDay);
+				let styleCustom = '';
+				if (fakeDay.toLocaleDateString() == todayDate.toLocaleDateString()) {
+					styleCustom = 'style="font-weight: 700;"';
 				}
-			});
-			if (pushToDB) {
-				const allEvents = (await DB.getAllItems('AgendaCom', `Events`)) || [];
-				const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-				let eventsToSave = {};
-				console.time('Comparaison des événements');
-				allEvents.forEach(async (event) => {
-					if (!eventsJSON[event.id]) {
-						console.log('Event supprimé : ', event.id);
-						await DB.deleteItem('AgendaCom', `Events`, event.id);
-					}
-				});
-				console.timeEnd('Comparaison des événements');
-				console.time('Sauvegarde des événements');
-				console.log(eventsJSON);
-				eventsJSON = Object.values(eventsJSON);
-				eventsJSON.forEach(async (event) => {
-					if (!allEvents.find((e) => e.id == event.id)) {
-						eventsToSave[event.id] = event;
-					} else {
-						if (
-							!comparerObjets(
-								allEvents.find((e) => e.id == event.id),
-								event
-							)
-						) {
-							eventsToSave[event.id] = event;
-							console.log(
-								'Event modifié : \n Ancien : ',
-								allEvents.find((e) => e.id == event.id),
-								'\n Nouveau : ',
-								event
-							);
-						}
-					}
-
-					if (!allReseau.find((s) => s.id == event.reseau)) {
-						ajusterReseau(event.reseau);
-					}
-				});
-				console.timeEnd('Sauvegarde des événements');
-				console.time('Sauvegarde des événements dans la base de données');
-
-				if (_.isEmpty(eventsToSave)) {
-					console.log('Aucun événement à sauvegarder');
-				} else {
-					eventsToSave = Object.values(eventsToSave);
-					eventsToSave.forEach(async (event) => {
-						await DB.saveItem('AgendaCom', `Events`, event);
+				columns.innerHTML = `
+					<div class="calendar-columns-header">
+							<span class="calendar-columns-header-title" ${styleCustom}>${fakeDay.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}</span>
+							<div class="calendar-columns-header-info"></div>
+					</div>
+					<div class="calendar-columns-content"></div>`;
+				const listOfChips = await checkChipsForDays(fakeDay);
+				if (listOfChips) {
+					listOfChips.forEach((chip) => {
+						columns.querySelector('.calendar-columns-header-info').appendChild(chip);
 					});
-					console.log('Il y a ', eventsToSave.length, ' événements à sauvegarder');
-					displayEvents();
 				}
-				console.timeEnd('Sauvegarde des événements dans la base de données');
-				console.log('Events sauvegardés dans la base de données');
-			} else {
-				console.groupEnd();
-				return eventsJSON;
+				fakeDay.setDate(fakeDay.getDate() + 1);
+				monthDiv.appendChild(columns);
 			}
-			console.groupEnd();
-			if (missingKey.length > 0) {
-				console.groupCollapsed('Clés manquantes');
-				console.log(missingKey);
-				console.groupEnd();
-			}
+			contentCalendar.appendChild(monthDiv);
+			killLoadingSpinner(2);
 		}
 
-		function errorHandler(error) {
-			popUp('red', 8000, 'Erreur lors de la récupération des événements', error, 'error', true);
-		}
-	}
-	/***************************************** Gestions des reseaux ***********************************************/
-
-	function checkReseaux() {
-		for (const roomName in listeReseauJSON) {
-			ajusterReseau(roomName);
-		}
-
-		google.script.run.withSuccessHandler(reseauxRetrieve).withFailureHandler(errorRetrieve).getDataFromSpreadsheet('Listes!A2:A');
-
-		function reseauxRetrieve(reseaux) {
-			reseaux.forEach((reseau) => {
-				if (!listeReseauJSON.hasOwnProperty([reseau[0]])) {
-					listeReseauJSON[reseau[0]] = { id: reseau[0], couleur: '#F1C8DB', show: true };
-				}
-			});
-		}
-
-		function errorRetrieve() {
-			console.error('Erreur lors de la récupération des reseaux');
-		}
-	}
-
-	// Gestions des reseaux modifié/n'existant pas
-	async function ajusterReseau(reseau, getColor = false) {
-		let reseauEdit = reseau;
-		/*switch (reseau) {
-			case 'IG':
-				reseauEdit = 'Instagram';
-				break;
-			case 'LK':
-				reseauEdit = 'LinkedIn';
-				break;
-			case 'YT':
-				reseauEdit = 'YouTube';
-				break;
-			case 'X':
-				reseauEdit = 'X';
-				break;
-			case 'FB':
-				reseauEdit = 'Facebook';
-				break;
-			case 'TK':
-				reseauEdit = 'TikTok';
-				break;
-			case 'GDES SEQ.':
-				reseauEdit = 'GDES SEQ.';
-				break;
-			default:
-				reseauEdit = reseau;
-				break;
-		}*/
-		if (!getColor) {
-			if (!listeReseauJSON[reseauEdit]) {
-				const couleurReseau = '#CDC1FF';
-				const couleurTexte = darkenColor(couleurReseau, 0.5);
-				console.log('Reseau ajustée :', reseauEdit, ' - ', couleurReseau, ' - ', couleurTexte);
-				await DB.saveItem('AgendaCom', 'Variables', { id: reseauEdit, couleurReseau: couleurReseau, couleurTexte: couleurTexte, show: false });
-			} else {
-				const allReseaux = await DB.getAllItems('AgendaCom', 'Variables');
-				if (!allReseaux.find((s) => s.id == reseauEdit)) {
-					const couleurReseau = listeReseauJSON[reseauEdit].couleur;
-					const couleurTexte = darkenColor(couleurReseau, 0.5);
-					const show = listeReseauJSON[reseauEdit].show;
-					await DB.saveItem('AgendaCom', 'Variables', { id: reseauEdit, couleurReseau: couleurReseau, couleurTexte: couleurTexte, show: show });
-				}
-			}
-		} else {
-			return listeReseauJSON[reseauEdit].couleur;
-		}
-	}
-
-	/***************************************** Affichage des événements ***********************************************/
-
-	async function displayEvents() {
-		const columns = contentCalendar.querySelectorAll('.calendar-columns');
-		const allEvents = await DB.getAllItems('AgendaCom', 'Events');
-		let identifier = '';
-		columns.forEach((column) => {
+		async function updateDaysSelected(date) {
+			selectedDate = date;
+			await DB.saveItem(dbName, 'Preferences', { id: 'selectedDate', value: selectedDate, used: (await isPreferenceUsed('selectedDate')) ? true : false });
+			[firstDayOfWeek, lastDayOfWeek] = getFirstAndLastDayOfWeek(selectedDate);
 			if (viewMode == 'week') {
-				identifier = new Date(column.dataset.identifier);
+				flatDatePicker.set('mode', 'range');
+				changePickerDate([firstDayOfWeek, lastDayOfWeek]);
+			} else if (viewMode == 'day') {
+				flatDatePicker.set('mode', 'single');
+				changePickerDate(selectedDate);
+			} else if (viewMode == 'month') {
+				flatDatePicker.set('mode', 'range');
+				changePickerDate([new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)]);
+			}
+			calendarUpdate();
+		}
+
+		function navigationNext() {
+			if (viewMode == 'week') {
+				selectedDate.setDate(selectedDate.getDate() + 7);
+			} else if (viewMode == 'day') {
+				selectedDate.setDate(selectedDate.getDate() + 1);
+			} else if (viewMode == 'month') {
+				selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
+			}
+			updateDaysSelected(selectedDate);
+		}
+
+		function navigationPrevious() {
+			if (viewMode == 'week') {
+				selectedDate.setDate(selectedDate.getDate() - 7);
+			} else if (viewMode == 'day') {
+				selectedDate.setDate(selectedDate.getDate() - 1);
+			} else if (viewMode == 'month') {
+				selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+			}
+			updateDaysSelected(selectedDate);
+		}
+
+		document.querySelector('#navigation-next').addEventListener('click', navigationNext);
+		document.querySelector('#navigation-previous').addEventListener('click', navigationPrevious);
+
+		window.addEventListener('keydown', async (e) => {
+			switch (e.key) {
+				case 'ArrowRight':
+					navigationNext();
+					break;
+				case 'ArrowLeft':
+					navigationPrevious();
+					break;
+				case 'ArrowUp':
+					await updateDaysSelected(selectedDate);
+					break;
+				default:
+					break;
+			}
+		});
+
+		function formatEvent(event, tableau, ligne, getListKeys = false) {
+			const format = {
+				id: event[COL_ID] + '_' + tableau,
+				//id: event[COL_RESEAU] + event[COL_TITRE] + ligne + '_' + tableau,
+				tableau: tableau,
+				ligne: ligne,
+				semaine: event[COL_SEMAINE],
+				reseau: event[COL_RESEAU],
+				date: event[COL_DATE] ? convertAbregedStringToDate(event[COL_DATE], tableau) : '',
+				heurePublication: event[COL_HEURE_PUBLICATION],
+				titre: event[COL_TITRE],
+				dateEvent: event[COL_DATE_EVENT],
+				type: event[COL_TYPE],
+				etatCrea: event[COL_ETAT_CREA],
+				etatEdito: event[COL_ETAT_EDITO],
+				etatMinia: event[COL_ETAT_MINIA],
+				precision: event[COL_PRECISION],
+				items: event[COL_ITEMS],
+				couvertureS1: event[COL_COUV_S1],
+				couvertureNonFollowerS1Pourcent: event[COL_COUV_NONFOLLOW_S1_POURCENT],
+				couvertureNonFollowerS1Nombre: event[COL_COUV_NONFOLLOW_S1_NB],
+				likeS1: event[COL_LIKE_S1],
+				commentS1: event[COL_COMMENT_S1],
+				partageS1: event[COL_PARTAGE_S1],
+				enregistrement: event[COL_ENREGISTREMENT],
+				totalInteraction: event[COL_TOTAL_INTERACTION],
+				abonneEnPlus: event[COL_ABONNE_EN_PLUS],
+				vueMoyenne: event[COL_VUE_MOY],
+				clicLien: event[COL_CLIC_LIEN],
+				engagementS1: event[COL_ENGAGEMENT_S1],
+				remarques: event[COL_REMARQUES],
+				oldObjectifs: event[COL_OLD_OBJECTIFS],
+				oldPilliersEdito: event[COL_OLD_PILLIERS_EDITO],
+			};
+			if (getListKeys) {
+				return Object.keys(format);
 			} else {
-				identifier = new Date(selectedDate);
+				return format;
 			}
-			const eventsFiltered = [];
-			column.querySelectorAll('.calendar-event').forEach((event) => event.remove());
-			// Récupération des événements depuis la BD
-			allEvents.forEach((event) => {
-				if (estDansPlageJour(event.date, identifier, identifier, true)) {
-					eventsFiltered.push(event);
-				}
-			});
+		}
 
-			appearEventIntoColumns(column, eventsFiltered);
-		});
-		actualiseZIndex();
-	}
-
-	function actualiseZIndex() {
-		const columns = contentCalendar.querySelectorAll('.calendar-columns');
-
-		columns.forEach((columns) => {
-			const eventContainers = columns.querySelectorAll('.calendar-event-container');
-			const sortedEventContainers = Array.from(eventContainers).sort((a, b) => {
-				return a.dataset.heureDebut - b.dataset.heureDebut;
-			});
-			sortedEventContainers.forEach((eventContainer, index) => {
-				eventContainer.dataset.zIndex = index + 1;
-				const events = eventContainer.querySelectorAll('.calendar-event');
-				events.forEach((event) => {
-					event.style.zIndex = eventContainer.dataset.zIndex;
-				});
-			});
-			const allEvents = columns.querySelectorAll('.calendar-event');
-			allEvents.forEach((event) => {
-				const parentContainer = event.closest('.calendar-event-container');
-				const zIndex = parentContainer ? parentContainer.dataset.zIndex : 1;
-				event.style.zIndex = zIndex;
-			});
-		});
-	}
-
-	async function appearEventIntoColumns(column, eventsList) {
-		const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-		let allKeysWhatToShow = await DB.getItem('AgendaCom', 'Preferences', 'whatToShow');
-		let keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
-		eventsList.forEach(async (event) => {
-			let calendarContainer = column.querySelector(`.calendar-event-container[data-heure-debut="${event.heureDebut}"]`);
-			if (!calendarContainer) {
-				calendarContainer = document.createElement('div');
-				calendarContainer.className = 'calendar-event-container';
-				calendarContainer.dataset.heureDebut = event.heureDebut;
-				calendarContainer.style.width = column.clientWidth + 'px';
-				window.addEventListener('resize', () => {
-					calendarContainer.style.width = column.clientWidth + 'px';
-				});
+		async function retrieveEvents(tableau = 'Event', dateAtStart, pushToDB = true, forceRefresh = false) {
+			appearLoadingSpinner(2);
+			let range = '';
+			let ligneToStart = 2;
+			let lastEventUpdate = await DB.getItem(dbName, 'Variables', 'lastEventUpdate');
+			if (lastEventUpdate) {
+				lastEventUpdate = lastEventUpdate['value'];
 			}
-			const eventElement = document.createElement('div');
-			eventElement.className = 'calendar-event';
-			eventElement.dataset.id = event.id;
-			eventElement.dataset.tableau = event.tableau;
-			eventElement.dataset.ligne = event.ligne;
-			eventElement.dataset.date = event.date;
-			eventElement.dataset.reseau = event.reseau;
-			const eventContent = document.createElement('div');
-			eventContent.className = 'calendar-event-content';
+			if (!lastEventUpdate || new Date(lastEventUpdate).getTime() < new Date().getTime() - 15000 || forceRefresh) {
+				range = '' + tableau + '!' + colonneMin + '' + ligneToStart + ':' + colonneMax;
+				google.script.run.withSuccessHandler(eventRetrieved).withFailureHandler(errorHandler).getDataFromSpreadsheet(range);
 
-			eventContent.innerHTML = `
-			`;
-			let hoursAdded = false;
-			let aleardyAdded = [];
-
-			async function getKeys() {
-				const keysSelectedAndInTableau = keysToShow.filter((key) => key.selected);
-				if (keysSelectedAndInTableau.length == 0) {
-					allKeysWhatToShow = await DB.getItem('Agenda', 'Preferences', 'whatToShow');
-					keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
-					setTimeout(() => {
-						getKeys();
-					}, 1000);
-				}
-				keysSelectedAndInTableau.forEach((key) => {
-					const keyToShow = key.value;
-					console.log(keyToShow);
-					if (keyToShow == 'date') {
-						eventContent.innerHTML += `<div class="calendar-event-content-date">${convertDateToAbregedString(new Date(event.date))}</div>`;
-					} else if (keyToShow == 'titre') {
-						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500; margin-bottom: 0.5vh">${event[keyToShow]}</div>`;
-					} else if (keyToShow == 'reseau') {
-						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500;">${event[keyToShow]}</div>`;
-					} else {
-						eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}">${formatString(keyToShow)} : ${event[keyToShow]}</div>`;
-					}
-				});
+				await DB.saveItem(dbName, 'Variables', { id: 'lastEventUpdate', value: new Date() });
+			} else {
+				console.warn(
+					'Récupération des événements déjà effectuée il y a moins de 15 secondes (' + Math.abs((new Date(lastEventUpdate).getTime() - new Date().getTime()) / 1000) + ')'
+				);
 			}
 
-			await getKeys();
-			eventElement.appendChild(eventContent);
-			calendarContainer.appendChild(eventElement);
-			column.querySelector('.calendar-columns-content').appendChild(calendarContainer);
-
-			allReseau.forEach((reseau) => {
-				if (reseau.id == event.reseau) {
-					eventContent.style.backgroundColor = reseau.couleurReseau || '';
-					eventContent.style.color = reseau.couleurTexte || '';
-					eventContent.style.borderColor = reseau.couleurTexte || '';
-
-					if (!reseau.show) {
-						eventElement.style.height = '0';
+			async function eventRetrieved(events) {
+				console.log('Récupération des événements : ', events);
+				if (!comparerObjets(dateAtStart, getFirstAndLastDayOfWeek(selectedDate)[0])) {
+					console.warn('Dates changées.. Abandon de la récupération des événements');
+					return;
+				}
+				let missingKey = [];
+				console.groupCollapsed('Récupération des événements ' + tableau);
+				let ligne = ligneToStart;
+				let eventsJSON = {};
+				events.forEach(async (event) => {
+					ligne += 1;
+					/******** A ENLEVER / MODIFIER ********
+					if (event[0] != '') {
+						const formatedEvent = await formatEvent(event, tableau, ligne - 1);
+						eventsJSON[formatedEvent['id']] = formatedEvent;
 					}
-				}
-			});
-			const colorBackground = eventContent.style.backgroundColor;
-			const insideHeight = eventContent.scrollHeight;
+					/******** A ENLEVER / MODIFIER ********/
 
-			eventElement.addEventListener('mouseenter', () => {
-				if (eventElement.clientHeight < insideHeight) {
-					eventElement.style.height = '100%';
-				}
-				eventContent.style.backgroundColor = lighterColor(colorBackground, 0.5);
-				eventContent.querySelectorAll('div').forEach((element) => {
-					element.style.whiteSpace = 'normal';
-				});
-			});
-
-			eventElement.addEventListener('mouseleave', () => {
-				eventContent.style.backgroundColor = colorBackground;
-				eventElement.style.height = '';
-				eventContent.querySelectorAll('div').forEach((element) => {
-					element.style.whiteSpace = '';
-				});
-			});
-
-			eventElement.addEventListener('click', () => {
-				appearEventInContenu(event);
-			});
-		});
-	}
-
-	function appearEventInContenu(event) {
-		console.log(event);
-	}
-
-	/***************************************** Menu & Material Design ******************************************/
-
-	function registerListenerMenuButton(button, menu) {
-		const anchorEl = document.body.querySelector(button);
-		const menuEl = document.body.querySelector(menu);
-
-		anchorEl.addEventListener('click', () => {
-			menuEl.open = !menuEl.open;
-		});
-	}
-
-	registerListenerMenuButton('#create-event-button', '#create-event-list');
-
-	async function appearReseauxInListLeft() {
-		const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-		if (allReseau.length <= 1) {
-			setTimeout(() => {
-				appearReseauxInListLeft();
-			}, 2000);
-		} else {
-			const listReseaux = document.querySelector('#listeReseaux-menu');
-			listReseaux.innerHTML = '';
-			// Boutons Tout afficher, Tout masquer, Uniquement Occupées
-			const boutonToutAfficher = document.createElement('md-filled-tonal-button');
-			boutonToutAfficher.textContent = 'Tout afficher';
-
-			const boutonToutMasquer = document.createElement('md-filled-tonal-button');
-			boutonToutMasquer.textContent = 'Tout masquer';
-
-			const boutonUniquementOccupes = document.createElement('md-filled-tonal-button');
-			boutonUniquementOccupes.textContent = 'Uniquement Occupées';
-
-			listReseaux.appendChild(boutonToutAfficher);
-			listReseaux.appendChild(boutonToutMasquer);
-			listReseaux.appendChild(boutonUniquementOccupes);
-
-			boutonToutAfficher.addEventListener('click', async () => {
-				allReseau.forEach(async (reseau) => {
-					reseau.show = true;
-					await DB.saveItem('AgendaCom', 'Variables', reseau);
-				});
-				document.querySelectorAll('.calendar-event').forEach((event) => {
-					event.style.height = '';
-				});
-				document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
-					checkbox.setAttribute('checked', '');
-				});
-			});
-
-			boutonToutMasquer.addEventListener('click', async () => {
-				allReseau.forEach(async (reseau) => {
-					reseau.show = false;
-					await DB.saveItem('AgendaCom', 'Variables', reseau);
-				});
-				document.querySelectorAll('.calendar-event').forEach((event) => {
-					event.style.height = '0';
-				});
-				document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
-					checkbox.removeAttribute('checked');
-				});
-			});
-
-			boutonUniquementOccupes.addEventListener('click', async () => {
-				allReseau.forEach(async (reseau) => {
-					const reseauDOM = document.querySelector('.calendar-event[data-reseau="' + reseau.id + '"]');
-					const allReseauDOM = document.querySelectorAll('.calendar-event[data-reseau="' + reseau.id + '"]');
-					const checkboxDOM = document.querySelector('#listeReseaux-menu label md-checkbox[data-reseau="' + reseau.id + '"]');
-					if (reseauDOM) {
-						reseau.show = true;
-						allReseauDOM.forEach((event) => {
-							event.style.height = '';
-						});
-						checkboxDOM.setAttribute('checked', '');
-					} else {
-						reseau.show = false;
-						allReseauDOM.forEach((event) => {
-							event.style.height = '0';
-						});
-						checkboxDOM.removeAttribute('checked');
+					if (event[0] != '') {
+						if (!event[COL_ID]) {
+							missingKey.push("Clé primaire manquante pour l'événement ligne " + (ligne - 1) + ' dans ' + tableau + ' : ', event);
+						} else {
+							const formatedEvent = await formatEvent(event, tableau, ligne - 1);
+							eventsJSON[event[COL_ID] + '_' + tableau] = formatedEvent;
+						}
 					}
-					await DB.saveItem('AgendaCom', 'Variables', reseau);
 				});
-			});
-
-			for (const reseau in listeReseauJSON) {
-				const reseauLabel = document.createElement('label');
-				const reseauCheckbox = document.createElement('md-checkbox');
-				reseauCheckbox.dataset.reseau = reseau;
-				reseauCheckbox.setAttribute('touch-target', 'wrapper');
-				if (allReseau.find((s) => s.id == reseau && s.show)) {
-					reseauCheckbox.setAttribute('checked', '');
-				}
-				reseauLabel.appendChild(reseauCheckbox);
-				reseauLabel.appendChild(document.createTextNode(reseau));
-				listReseaux.appendChild(reseauLabel);
-
-				reseauCheckbox.addEventListener('change', async (event) => {
-					const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-					const reseauToChange = allReseau.find((s) => s.id == reseau);
-					reseauToChange.show = reseauCheckbox.checked;
-					await DB.saveItem('AgendaCom', 'Variables', reseauToChange);
-					document.querySelectorAll('.calendar-event').forEach((event) => {
-						if (event.dataset.reseau == reseau) {
-							event.style.height = reseauCheckbox.checked ? '' : '0';
+				if (pushToDB) {
+					const allEvents = (await DB.getAllItems(dbName, `Events`)) || [];
+					const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value;
+					let eventsToSave = {};
+					console.time('Comparaison des événements');
+					allEvents.forEach(async (event) => {
+						if (!eventsJSON[event.id]) {
+							console.log('Event supprimé : ', event.id);
+							await DB.deleteItem(dbName, `Events`, event.id);
 						}
 					});
+					console.timeEnd('Comparaison des événements');
+					console.time('Sauvegarde des événements');
+					eventsJSON = Object.values(eventsJSON);
+					eventsJSON.forEach(async (event) => {
+						if (!allEvents.find((e) => e.id == event.id)) {
+							eventsToSave[event.id] = event;
+						} else {
+							if (
+								!comparerObjets(
+									allEvents.find((e) => e.id == event.id),
+									event
+								)
+							) {
+								eventsToSave[event.id] = event;
+								console.log(
+									'Event modifié : \n Ancien : ',
+									allEvents.find((e) => e.id == event.id),
+									'\n Nouveau : ',
+									event
+								);
+							}
+						}
+
+						if (!allCategories[event.reseau]) {
+							await ajusterCategorie(event.reseau);
+						}
+					});
+					console.timeEnd('Sauvegarde des événements');
+					console.time('Sauvegarde des événements dans la base de données');
+
+					if (_.isEmpty(eventsToSave)) {
+						console.log('Aucun événement à sauvegarder');
+					} else {
+						eventsToSave = Object.values(eventsToSave);
+						eventsToSave.forEach(async (event) => {
+							await DB.saveItem(dbName, `Events`, event);
+						});
+						console.log('Il y a ', eventsToSave.length, ' événements à sauvegarder');
+						displayEvents();
+					}
+					console.timeEnd('Sauvegarde des événements dans la base de données');
+					console.log('Events sauvegardés dans la base de données');
+				} else {
+					console.groupEnd();
+					return eventsJSON;
+				}
+				console.groupEnd();
+				if (missingKey.length > 0) {
+					console.groupCollapsed('Clés manquantes');
+					console.warn(missingKey);
+					console.groupEnd();
+				}
+			}
+			killLoadingSpinner(2);
+		}
+		/***************************************** Gestions des reseaux ***********************************************/
+
+		async function checkCategorie() {
+			for (const categorie in listeCategoriesJSON) {
+				await ajusterCategorie(categorie);
+			}
+
+			google.script.run.withSuccessHandler(categorieRetrieve).withFailureHandler(errorRetrieve).getDataFromSpreadsheet('Listes!A2:A');
+
+			function categorieRetrieve(reseaux) {
+				reseaux.forEach((reseau) => {
+					if (!listeCategoriesJSON.hasOwnProperty([reseau[0]])) {
+						listeCategoriesJSON[reseau[0]] = { id: reseau[0], couleur: '#F1C8DB', show: true };
+					}
 				});
 			}
-		}
-	}
 
-	appearReseauxInListLeft();
-
-	// Gestion des boutons menu droite
-
-	const changeThemeButton = document.querySelector('#change-theme-button');
-
-	changeThemeButton.addEventListener('click', () => {
-		document.querySelector('html').toggleAttribute('dark');
-		DB.saveItem('AgendaCom', 'Preferences', { id: 'darkMode', darkMode: document.querySelector('html').hasAttribute('dark') });
-	});
-
-	const elementToShowBtn = document.querySelector('#what-see-event-button');
-	const elementToShowList = document.querySelector('#what-see-event-checkbox-list');
-
-	async function generateListElementToShow() {
-		const allKeys = await DB.getItem('AgendaCom', 'Preferences', 'whatToShow');
-
-		if (!allKeys) {
-			setTimeout(() => {
-				generateListElementToShow();
-			}, 2000);
-		}
-
-		const keysArray = Object.values(Object.values(allKeys)[1]);
-		const keysEvent = keysArray.filter((key) => {
-			return key.id;
-		});
-		const title = document.createElement('div');
-		title.textContent = 'Liste Éléments';
-		title.className = 'titleList';
-		elementToShowList.appendChild(title);
-		if (keysEvent.length <= 0) {
-			setTimeout(() => {
-				generateListElementToShow();
-			}, 2000);
-		}
-		keysEvent.forEach((key) => {
-			const element = document.createElement('label');
-			const mdCheckbox = document.createElement('md-checkbox');
-			mdCheckbox.dataset.tableau = 'Event';
-			mdCheckbox.id = key.id;
-			if (key.selected) {
-				mdCheckbox.setAttribute('checked', '');
+			function errorRetrieve() {
+				console.error('Erreur lors de la récupération des reseaux');
 			}
-			mdCheckbox.setAttribute('touch-target', 'wrapper');
-
-			element.appendChild(mdCheckbox);
-			const spanValue = document.createElement('span');
-			spanValue.textContent = formatString(key.value);
-			element.appendChild(spanValue);
-
-			elementToShowList.appendChild(element);
-		});
-
-		function registerChangeCheckbox() {
-			elementToShowList.querySelectorAll('md-checkbox').forEach((checkbox) => {
-				checkbox.addEventListener('change', async (event) => {
-					isEditedShowValue = true;
-					const key = event.target.id;
-					const tableau = event.target.dataset.tableau;
-					const allKeys = await DB.getItem('AgendaCom', 'Preferences', 'whatToShow');
-					const valueKeys = allKeys.value;
-					const keyToChange = valueKeys[key];
-					keyToChange.selected = event.target.checked;
-					await DB.saveItem('AgendaCom', 'Preferences', { id: 'whatToShow', value: valueKeys });
-				});
-			});
 		}
 
-		registerChangeCheckbox();
-	}
+		// Gestions des reseaux modifié/n'existant pas
+		async function ajusterCategorie(reseau, getColor = false) {
+			let reseauEdit = reseau;
+			/*switch (reseau) {
+				case 'IG':
+					reseauEdit = 'Instagram';
+					break;
+				case 'LK':
+					reseauEdit = 'LinkedIn';
+					break;
+				case 'YT':
+					reseauEdit = 'YouTube';
+					break;
+				case 'X':
+					reseauEdit = 'X';
+					break;
+				case 'FB':
+					reseauEdit = 'Facebook';
+					break;
+				case 'TK':
+					reseauEdit = 'TikTok';
+					break;
+				case 'GDES SEQ.':
+					reseauEdit = 'GDES SEQ.';
+					break;
+				default:
+					reseauEdit = reseau;
+					break;
+			}*/
 
-	generateListElementToShow();
-
-	// Gestion du Bouton de la liste des éléments à afficher
-
-	let isWindowListenerAddedShowBtn = false;
-	let isEditedShowValue = false;
-
-	function windowClickListener(event) {
-		if (!elementToShowList.contains(event.target) && !elementToShowBtn.contains(event.target)) {
-			elementToShowList.dataset.open = 'false';
-			if (isEditedShowValue) {
-				isEditedShowValue = false;
-				displayEvents();
-			}
-
-			window.removeEventListener('click', windowClickListener);
-			isWindowListenerAddedShowBtn = false;
-			popUp('base', 3000, 'Les éléments à afficher ont été modifiés', '', 'info');
-		}
-	}
-
-	elementToShowBtn.addEventListener('click', () => {
-		elementToShowList.dataset.open = elementToShowList.dataset.open === 'true' ? 'false' : 'true';
-
-		if (!isWindowListenerAddedShowBtn) {
-			window.addEventListener('click', windowClickListener);
-			isWindowListenerAddedShowBtn = true;
-		}
-	});
-
-	// Gestion des couleurs des reseaux
-
-	const colorEventBtn = document.querySelector('#color-event-button');
-	const colorEventList = document.querySelector('#color-event-list');
-
-	async function generateListReseauColor() {
-		const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-		if (allReseau.length <= 0) {
-			setTimeout(() => {
-				generateListReseauColor();
-			}, 2000);
-		} else {
-			const resetColorBtn = document.createElement('md-filled-tonal-button');
-			resetColorBtn.textContent = 'Couleurs par défaut';
-			resetColorBtn.addEventListener('click', async () => {
-				allReseau.forEach(async (reseau) => {
-					const couleurReseau = await ajusterReseau(reseau.id, true);
-					reseau.couleurReseau = couleurReseau;
-
+			if (!getColor) {
+				const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories'))?.value;
+				const nombreDeKeys = Object.keys(Object.values(listeCategoriesJSON)[0]).length + 1;
+				// +1 car dans allCategories il y a couleurReseau et couleurTexte qui existent alors
+				// que dans listeCategoriesJSON il n'y a que couleur
+				if (!listeCategoriesJSON[reseauEdit]) {
+					const couleurReseau = '#CDC1FF';
 					const couleurTexte = darkenColor(couleurReseau, 0.5);
-					reseau.couleurTexte = couleurTexte;
-					await DB.saveItem('AgendaCom', 'Variables', reseau);
-					document.querySelectorAll('.calendar-event').forEach((event) => {
-						if (event.dataset.reseau == reseau.id) {
-							event.querySelector('.calendar-event-content').style.backgroundColor = couleurReseau;
-							event.querySelector('.calendar-event-content').style.color = couleurTexte;
-							event.querySelector('.calendar-event-content').style.borderColor = couleurTexte;
-							document.querySelector('#color-event-list input[data-reseau="' + event.dataset.reseau + '"]').value = couleurReseau;
+					console.log('Reseau ajustée :', reseauEdit, ' - ', couleurReseau, ' - ', couleurTexte);
+					const ordre = Object.keys(listeCategoriesJSON).length + 1;
+					let dbItem = await DB.getItem(dbName, 'Variables', 'listCategories');
+					let existingCategories = (dbItem && dbItem.value) || {};
+					let allCategoriesCopy = { ...existingCategories };
+					allCategoriesCopy[reseauEdit] = { id: reseauEdit, couleurReseau: couleurReseau, couleurTexte: couleurTexte, show: false, ordre: ordre };
+					let sortedCategories = Object.fromEntries(Object.entries(allCategoriesCopy).sort(([, a], [, b]) => a.ordre - b.ordre));
+					await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: sortedCategories });
+					//await DB.saveItem(dbName, 'Reseaux', { id: reseauEdit, couleurReseau: couleurReseau, couleurTexte: couleurTexte, show: false, ordre: ordre });
+				} else {
+					if (!allCategories || !allCategories[reseauEdit] || Object.keys(allCategories[reseauEdit]).length != nombreDeKeys) {
+						const couleurReseau = listeCategoriesJSON[reseauEdit].couleur;
+						const couleurTexte = darkenColor(couleurReseau, 0.5);
+						const show = listeCategoriesJSON[reseauEdit].show;
+						const ordre = listeCategoriesJSON[reseauEdit].ordre;
+						let dbItem = await DB.getItem(dbName, 'Variables', 'listCategories');
+						let existingCategories = (dbItem && dbItem.value) || {};
+						//console.log('Avant modification :', existingCategories);
+						let allCategoriesCopy = { ...existingCategories };
+						allCategoriesCopy[reseauEdit] = {
+							id: reseauEdit,
+							couleurReseau: couleurReseau,
+							couleurTexte: couleurTexte,
+							show: show,
+							ordre: ordre,
+						};
+						let sortedCategories = Object.fromEntries(Object.entries(allCategoriesCopy).sort(([, a], [, b]) => a.ordre - b.ordre));
+						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: sortedCategories });
+						//console.log('Après modification et tri :', sortedCategories);
+						//await DB.saveItem(dbName, 'Reseaux', { id: reseauEdit, couleurReseau: couleurReseau, couleurTexte: couleurTexte, show: show, ordre: ordre });
+					}
+				}
+			} else {
+				return listeCategoriesJSON[reseauEdit].couleur;
+			}
+		}
+
+		/***************************************** Affichage des événements ***********************************************/
+
+		async function displayEvents() {
+			const columns = contentCalendar.querySelectorAll('.calendar-columns');
+			const allEvents = await DB.getAllItems(dbName, 'Events');
+			let identifier = '';
+			console.groupCollapsed('Affichage des événements');
+			columns.forEach(async (column) => {
+				const eventsFiltered = [];
+				if (viewMode == 'week' || viewMode == 'month') {
+					identifier = new Date(column.dataset.identifier);
+					// Récupération des événements depuis la BD
+					allEvents.forEach((event) => {
+						if (estDansPlageJour(event.date, identifier, identifier, true)) {
+							eventsFiltered.push(event);
 						}
 					});
+				} else if (viewMode == 'day') {
+					identifier = column.dataset.identifier;
+					// Récupération des événements depuis la BD
+					allEvents.forEach((event) => {
+						if (identifier == event.reseau && estDansPlageJour(event.date, selectedDate, selectedDate, true)) {
+							eventsFiltered.push(event);
+						}
+					});
+				}
+				console.groupCollapsed('Date ' + identifier + ' - Events');
+				console.log(eventsFiltered);
+				console.groupEnd();
+				column.querySelectorAll('.calendar-event').forEach((event) => event.remove());
+
+				await appearEventIntoColumns(column, eventsFiltered);
+			});
+			console.groupEnd();
+			actualiseZIndex();
+		}
+
+		function actualiseZIndex() {
+			const columns = contentCalendar.querySelectorAll('.calendar-columns');
+
+			columns.forEach((columns) => {
+				const eventContainers = columns.querySelectorAll('.calendar-event-container');
+				const sortedEventContainers = Array.from(eventContainers).sort((a, b) => {
+					return a.dataset.heureDebut - b.dataset.heureDebut;
+				});
+				sortedEventContainers.forEach((eventContainer, index) => {
+					eventContainer.dataset.zIndex = index + 1;
+					const events = eventContainer.querySelectorAll('.calendar-event');
+					events.forEach((event) => {
+						event.style.zIndex = eventContainer.dataset.zIndex;
+					});
+				});
+				const allEvents = columns.querySelectorAll('.calendar-event');
+				allEvents.forEach((event) => {
+					const parentContainer = event.closest('.calendar-event-container');
+					const zIndex = parentContainer ? parentContainer.dataset.zIndex : 1;
+					event.style.zIndex = zIndex;
 				});
 			});
+		}
 
-			colorEventList.appendChild(resetColorBtn);
+		async function appearEventIntoColumns(column, eventsList) {
+			const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
+			let allKeysWhatToShow = await DB.getItem(dbName, 'Preferences', 'whatToShow');
+			let keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
+			eventsList.forEach(async (event) => {
+				let calendarContainer = column.querySelector(`.calendar-event-container[data-heure-debut="${event.heureDebut}"]`);
+				if (viewMode == 'week') {
+					if (!calendarContainer) {
+						calendarContainer = document.createElement('div');
+						calendarContainer.className = 'calendar-event-container';
+						calendarContainer.dataset.heureDebut = event.heureDebut;
+						/*calendarContainer.style.width = column.clientWidth + 'px';
+						document.querySelector('#content').addEventListener('resize', () => {
+							calendarContainer.style.width = column.clientWidth + 'px';
+						});*/
+					}
+				}
+				const eventElement = document.createElement('div');
+				eventElement.className = 'calendar-event';
+				eventElement.dataset.id = event.id;
+				eventElement.dataset.tableau = event.tableau;
+				eventElement.dataset.ligne = event.ligne;
+				eventElement.dataset.date = event.date;
+				if (event.reseau == 'IG' && event.type == 'Story') {
+					event.reseau = 'IG STORY';
+				}
+				eventElement.dataset.reseau = event.reseau;
+				const eventContent = document.createElement('div');
+				eventContent.className = 'calendar-event-content';
 
-			for (const reseau in listeReseauJSON) {
-				const reseauLabel = document.createElement('label');
-				const reseauColorBox = document.createElement('input');
-				reseauColorBox.type = 'color';
-				reseauColorBox.dataset.reseau = reseau;
-				const reseauArray = allReseau.find((s) => s.id == reseau);
-				if (reseauArray) {
-					reseauColorBox.value = reseauArray.couleurReseau;
+				eventContent.innerHTML = `
+				`;
+				let hoursAdded = false;
+				let aleardyAdded = [];
 
-					reseauLabel.appendChild(reseauColorBox);
-					const spanValue = document.createElement('span');
-					spanValue.textContent = reseau;
-					reseauLabel.appendChild(spanValue);
-					colorEventList.appendChild(reseauLabel);
+				async function getKeys() {
+					const keysSelectedAndInTableau = keysToShow.filter((key) => key.selected);
+					if (keysSelectedAndInTableau.length == 0) {
+						allKeysWhatToShow = await DB.getItem('Agenda', 'Preferences', 'whatToShow');
+						keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
+						setTimeout(() => {
+							getKeys();
+						}, 1000);
+					}
+					keysSelectedAndInTableau.forEach((key) => {
+						const keyToShow = key.value;
+						switch (keyToShow) {
+							case 'date':
+							case 'dateEvent':
+								eventContent.innerHTML += `<div class="calendar-event-content-date">${convertDateToAbregedString(new Date(event[keyToShow]))}</div>`;
+								break;
+							case 'titre':
+							case 'type':
+							case 'reseau':
+								eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}" style="white-space: wrap; font-weight: 500;">${event[keyToShow]}</div>`;
+								break;
+							default:
+								eventContent.innerHTML += `<div class="calendar-event-content-${keyToShow}">${formatString(keyToShow)} : ${event[keyToShow]}</div>`;
+								break;
+						}
+					});
+				}
 
-					reseauColorBox.addEventListener('change', async (event) => {
-						const allReseau = await DB.getAllItems('AgendaCom', 'Variables');
-						const reseauToChange = allReseau.find((s) => s.id == reseau);
-						reseauToChange.couleurReseau = reseauColorBox.value;
-						await DB.saveItem('AgendaCom', 'Variables', reseauToChange);
-						document.querySelectorAll('.calendar-event').forEach((event) => {
-							if (event.dataset.reseau == reseau) {
-								event.querySelector('.calendar-event-content').style.backgroundColor = reseauColorBox.value;
-								event.querySelector('.calendar-event-content').style.color = darkenColor(reseauColorBox.value, 0.5);
-								event.querySelector('.calendar-event-content').style.borderColor = darkenColor(reseauColorBox.value, 0.5);
+				await getKeys();
+				eventElement.appendChild(eventContent);
+				if (viewMode == 'week') {
+					calendarContainer.appendChild(eventElement);
+					column.querySelector('.calendar-columns-content').appendChild(calendarContainer);
+				} else {
+					column.querySelector('.calendar-columns-content').appendChild(eventElement);
+				}
+
+				Object.values(allCategories.value).forEach((categorie) => {
+					if (categorie.id == event.reseau) {
+						/*if (isPreferenceUsed('useCustomColor')) {
+							eventContent.style.backgroundColor = '';
+							eventContent.style.color = '';
+							eventContent.style.borderColor = '';
+						} else {
+							eventContent.style.backgroundColor = categorie.couleurReseau || '';
+							eventContent.style.color = categorie.couleurTexte || '';
+							eventContent.style.borderColor = categorie.couleurTexte || '';
+						}*/
+
+						eventContent.style.backgroundColor = categorie.couleurReseau || '';
+						eventContent.style.color = categorie.couleurTexte || '';
+						eventContent.style.borderColor = categorie.couleurTexte || '';
+						if (!categorie.show) {
+							if (viewMode == 'week' || viewMode == 'month') {
+								eventElement.style.height = '0';
+							} else {
+								column.classList.add('inactive');
+							}
+						}
+					}
+				});
+
+				let beforeColor = eventContent.style.backgroundColor;
+				const insideHeight = eventContent.scrollHeight;
+
+				eventElement.addEventListener('mouseenter', () => {
+					const colorBackground = eventContent.style.backgroundColor;
+					beforeColor = colorBackground;
+					if (eventElement.clientHeight < insideHeight) {
+						eventElement.style.height = '100%';
+					}
+					eventContent.style.backgroundColor = lighterColor(colorBackground, 0.5);
+					eventContent.querySelectorAll('div').forEach((element) => {
+						element.style.whiteSpace = 'normal';
+					});
+				});
+
+				eventElement.addEventListener('mouseleave', () => {
+					eventContent.style.backgroundColor = beforeColor;
+					eventElement.style.height = '';
+					eventContent.querySelectorAll('div').forEach((element) => {
+						element.style.whiteSpace = '';
+					});
+				});
+
+				eventElement.addEventListener('click', () => {
+					document.querySelector('md-tabs').setAttribute('active-tab-index', '0');
+					appendEventInSpace(event, '#content-tab[role="tabpanel"]', '#event-fields');
+				});
+			});
+		}
+
+		async function getField(event, keysEvent, isCreation = false) {
+			let listOfFields = [];
+			for (let key in keysEvent) {
+				key = keysEvent[key];
+				if (key.startsWith('custom')) {
+					const keyName = key.split('_')[1];
+					const keyElement = document.createElement('keyName');
+					keyElement.textContent = keyName;
+				} else {
+					const wrapperEvent = document.createElement('div');
+					wrapperEvent.className = 'event-fields-wrapper';
+					const labelEvent = document.createElement('label');
+					labelEvent.textContent = formatString(key).replace('S 1', 'S1');
+					labelEvent.htmlFor = `event-content-${key}`;
+					const elementToAppend = document.createElement('input');
+
+					elementToAppend.id = `event-content-${key}`;
+					elementToAppend.className = 'event-content-field';
+					if (event[key] == undefined) {
+						event[key] = '';
+					}
+					elementToAppend.value = event[key];
+
+					labelEvent.className = 'event-content-label';
+
+					const selectElement = document.createElement('select');
+					selectElement.id = `event-content-${key}`;
+					selectElement.className = 'event-content-field';
+
+					wrapperEvent.appendChild(labelEvent);
+					switch (key) {
+						case 'id':
+						case 'tableau':
+						case 'ligne':
+						case 'semaine':
+							wrapperEvent.style.display = 'none';
+							const hiddenElement = document.createElement('input');
+							hiddenElement.type = 'hidden';
+							hiddenElement.className = 'event-content-field';
+							hiddenElement.id = `event-content-${key}`;
+							if (!isCreation) {
+								hiddenElement.required = true;
+							}
+							hiddenElement.value = event[key];
+							wrapperEvent.appendChild(hiddenElement);
+							break;
+						case 'type':
+						case 'items':
+						case 'oldObjectifs':
+						case 'oldPilliersEdito':
+						case 'etatCrea':
+						case 'etatEdito':
+						case 'etatMinia':
+							const nomVariable = key + 'Field';
+							if (listeSelect[nomVariable]) {
+								listeSelect[nomVariable].forEach((contenu) => {
+									const option = document.createElement('option');
+									option.value = contenu;
+									option.textContent = contenu;
+									if (event[key] == contenu) {
+										option.selected = true;
+									}
+									selectElement.appendChild(option);
+								});
+							}
+
+							if (!listeSelect[nomVariable].includes(event[key])) {
+								const option = document.createElement('option');
+								option.value = event[key];
+								option.textContent = event[key];
+								option.selected = true;
+								selectElement.appendChild(option);
+							}
+
+							await wrapperEvent.appendChild(selectElement);
+
+							break;
+						case 'reseau':
+							const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value;
+							for (const categorie in allCategories) {
+								const option = document.createElement('option');
+								option.value = categorie;
+								option.textContent = categorie;
+								if (event[key] == categorie) {
+									option.selected = true;
+								}
+								selectElement.appendChild(option);
+							}
+							selectElement.required = true;
+							wrapperEvent.style.width = '100%';
+							wrapperEvent.appendChild(selectElement);
+							selectElement.addEventListener('change', async () => {
+								if (selectElement.value == 'IG STORY') {
+									document.querySelector('#event-content-type').value = 'Story';
+								}
+							});
+							break;
+						case 'date':
+						case 'dateEvent':
+							elementToAppend.required = true;
+							elementToAppend.type = 'date';
+							wrapperEvent.style.width = '100%';
+							elementToAppend.value = formatDate(new Date(event[key]));
+							wrapperEvent.appendChild(elementToAppend);
+							break;
+						case 'heurePublication':
+							elementToAppend.required = true;
+							elementToAppend.type = 'time';
+							wrapperEvent.style.width = '100%';
+							elementToAppend.value = event[key].split('h')[0] + ':' + (event[key].split('h')[1] ? event[key].split('h')[1] : '00');
+							wrapperEvent.appendChild(elementToAppend);
+							break;
+						case 'titre':
+							elementToAppend.required = true;
+							wrapperEvent.style.width = '100%';
+							elementToAppend.tagName = 'textarea';
+							elementToAppend.type = isNumber(event[key]) ? 'number' : 'text';
+							wrapperEvent.appendChild(elementToAppend);
+							break;
+						default:
+							elementToAppend.type = isNumber(event[key]) ? 'number' : 'text';
+							wrapperEvent.appendChild(elementToAppend);
+							break;
+					}
+
+					listOfFields.push(wrapperEvent);
+				}
+			}
+			return listOfFields;
+		}
+
+		async function appendEventInSpace(event, whereToAppend, whereToAppendField = '', inBig = false) {
+			appearLoadingSpinner(2);
+			const keysEvent = formatEvent([], 'Event', 0, true);
+			console.log(event);
+			function appendAfterKey(key, keyNameToAppend, keyValueToAppend) {
+				const positionOfSearchedKey = keysEvent.indexOf(key);
+				keysEvent.splice(positionOfSearchedKey + 1, 0, keyNameToAppend);
+				event[keyNameToAppend] = keyValueToAppend;
+			}
+
+			function appendBeforeKey(key, keyNameToAppend, keyValueToAppend) {
+				const positionOfSearchedKey = keysEvent.indexOf(key);
+				keysEvent.splice(positionOfSearchedKey, 0, keyNameToAppend);
+				event[keyNameToAppend] = keyValueToAppend;
+			}
+
+			function changeOrder(index1, index2) {
+				const temp = keysEvent[index1];
+				keysEvent[index1] = keysEvent[index2];
+				keysEvent[index2] = temp;
+			}
+
+			function moveKeyToTheEnd(key) {
+				const positionOfSearchedKey = keysEvent.indexOf(key);
+				keysEvent.splice(positionOfSearchedKey, 1);
+				keysEvent.push(key);
+			}
+			const hoursEvent = event.heurePublication.split('h')[0] ? event.heurePublication.split('h')[0] : 23;
+			const minutesEvent = event.heurePublication.split('h')[1] ? event.heurePublication.split('h')[1] : 59;
+			const dateCompare = new Date(event.date).setHours(hoursEvent, minutesEvent, 0, 0);
+			const eventIsPassed = new Date(dateCompare).getTime() < new Date().getTime();
+			whereToAppend = document.querySelector(whereToAppend);
+			whereToAppendField = document.querySelector(whereToAppendField);
+			let elementToAppendList = whereToAppendField ? whereToAppendField : whereToAppend;
+			if (whereToAppend) {
+				if (whereToAppendField) {
+					if (!inBig) {
+						whereToAppend.innerHTML = '<div id="event-badges"></div>';
+					} else {
+						whereToAppend.innerHTML = '';
+					}
+					whereToAppend.innerHTML += '<div id="' + whereToAppendField.id + '"></div>';
+					whereToAppendField = document.querySelector('#' + whereToAppendField.id);
+					elementToAppendList = whereToAppendField;
+				} else {
+					whereToAppend.innerHTML = '';
+				}
+
+				const allFields = await getField(event, keysEvent);
+				allFields.forEach((field) => {
+					elementToAppendList.appendChild(field);
+				});
+
+				const buttonSave = document.createElement('md-filled-tonal-button');
+				buttonSave.textContent = 'Enregistrer';
+				buttonSave.addEventListener('click', () => {
+					appearLoadingSpinner(1);
+					let eventData = {};
+
+					const allElements = elementToAppendList.querySelectorAll('.event-content-field');
+					allElements.forEach((element) => {
+						eventData[element.id.split('-')[2]] = element.value;
+						if (element.required == true && element.value == '') {
+							element.style.border = '1px solid red';
+							popUp('red', 3000, "Modification de l'événement", 'Veuillez remplir tous les champs obligatoires', 'error', true);
+							killAll();
+							throw new Error('Veuillez remplir tous les champs obligatoires');
+						} else {
+							element.style.border = '';
+						}
+					});
+					eventData['id'] = eventData['id'].split('_')[0];
+					//killAll(false);
+					popUp('base', 1500, "Modification de l'événement", "L'événement est en cours de modification", 'hourglass');
+					// CHANGEMENT DE L'ORDRE DES CLE POUR CORRESPONDRE AU TABLEAU
+					moveKeyToTheEnd('id');
+
+					google.script.run
+						.withSuccessHandler(async (result) => {
+							killLoadingSpinner(1);
+							if (result == 1) {
+								try {
+									popUp('base', 1500, "Modification de l'événement", "L'événement a été modifié", 'celebration');
+									eventData['id'] = eventData['id'] + '_' + eventData['tableau'];
+									await DB.saveItem(dbName, 'Events', eventData);
+									updateDaysSelected(selectedDate);
+								} catch (e) {
+									popUp('red', 8000, "Modification de l'événement", e.message, 'error', true);
+									console.error(e);
+								}
+							} else {
+								console.error(result);
+								popUp('red', 8000, "Modification de l'événement", result, 'error', true);
+							}
+						})
+						.withFailureHandler((result) => {
+							killLoadingSpinner(1);
+							popUp('base', 8000, "Modification de l'événement", result, 'error', true);
+						})
+						.editEventInCalendar(eventData, keysEvent);
+				});
+
+				if (!inBig) {
+					if (eventIsPassed) {
+						buttonSave.setAttribute('disabled', '');
+						const badgesDiv = whereToAppend.querySelector('#event-badges');
+						const chipElement = document.createElement('div');
+						chipElement.className = 'chipEvent';
+						chipElement.textContent = 'Date de publication passé';
+						badgesDiv.appendChild(chipElement);
+					} else {
+						const badgesDiv = whereToAppend.querySelector('#event-badges');
+						badgesDiv.innerHTML = '';
+					}
+
+					const buttonInBig = document.createElement('md-outlined-button');
+					buttonInBig.textContent = "Plus d'options";
+					buttonInBig.addEventListener('click', () => {
+						const modalInBigContainer = document.createElement('div');
+						modalInBigContainer.className = 'killable';
+						modalInBigContainer.id = 'modal-in-big-event-container';
+						const modalInBig = document.createElement('div');
+						modalInBig.id = 'modal-in-big-event';
+						modalInBig.innerHTML = `
+						<div slot="headline">
+							<h1>Options avancées</h1>
+							<div class="badges">
+							</div>
+						</div>
+						<div slot="content" id="modal-content-event">
+							<div id="event-fields-in-big"></div>
+						</div>
+						<div slot="actions">
+						</div>
+						`;
+						modalInBigContainer.appendChild(modalInBig);
+						document.body.appendChild(modalInBigContainer);
+						appendEventInSpace(event, '#modal-in-big-event div[slot="actions"]', '#event-fields-in-big', true);
+						modalInBigContainer.addEventListener('click', (e) => {
+							if (e.target.id == 'modal-in-big-event-container') {
+								modalInBigContainer.remove();
 							}
 						});
 					});
+					whereToAppend.appendChild(buttonInBig);
+					whereToAppend.appendChild(buttonSave);
 				} else {
-					console.error('Reseau non trouvée : ', reseau);
+					buttonSave.classList.add('button-in-big');
+					whereToAppend.appendChild(buttonSave);
+
+					const fakeDiv = document.createElement('div');
+					fakeDiv.classList.add('width-100');
+					fakeDiv.style.display = 'flex';
+					fakeDiv.style.justifyContent = 'space-between';
+					fakeDiv.style.gap = '0.5vw';
+
+					const duplicateButton = document.createElement('md-outlined-button');
+
+					/******** A ENLEVER / MODIFIER ********/
+					duplicateButton.setAttribute('disabled', '');
+					/******** A ENLEVER / MODIFIER ********/
+
+					duplicateButton.textContent = 'Dupliquer';
+					duplicateButton.addEventListener('click', () => {
+						document.querySelector('#modal-in-big-event-container').remove();
+					});
+					fakeDiv.appendChild(duplicateButton);
+
+					const closeButton = document.createElement('md-outlined-button');
+					closeButton.textContent = 'Fermer';
+					closeButton.addEventListener('click', () => {
+						killAll();
+					});
+					fakeDiv.appendChild(closeButton);
+
+					const deleteButton = document.createElement('md-outlined-button');
+					deleteButton.textContent = 'Supprimer';
+					buttonSave.classList.add('button-in-big');
+					deleteButton.addEventListener('click', () => {
+						console.log("Suppression de l'événement : ", event);
+						const windowsConfirmation = window.confirm('Voulez-vous vraiment supprimer cet événement ?');
+						if (windowsConfirmation) {
+							let eventData = {};
+
+							const allElements = elementToAppendList.querySelectorAll('.event-content-field');
+							allElements.forEach((element) => {
+								eventData[element.id.split('-')[2]] = element.value;
+							});
+							eventData['id'] = eventData['id'].split('_')[0];
+							killAll();
+							appearLoadingSpinner(1);
+							popUp('base', 1500, "Suppression de l'événement", "L'événement est en cours de suppression", 'hourglass');
+							google.script.run
+								.withSuccessHandler(async (result) => {
+									killLoadingSpinner(1);
+									popUp('base', 1500, "Suppression de l'événement", "L'événement a été supprimé", 'celebration');
+									await DB.deleteItem(dbName, 'Events', eventData['id']);
+									updateDaysSelected(selectedDate);
+								})
+								.withFailureHandler((result) => {
+									killLoadingSpinner(1);
+									popUp('base', 5000, "Suppression de l'événement", result, 'error', true);
+								})
+								.deleteEventInCalendar(eventData, keysEvent);
+						}
+					});
+					fakeDiv.appendChild(deleteButton);
+
+					const parentOfWhereToAppend = whereToAppend.parentElement;
+					const badges = parentOfWhereToAppend.querySelector('.badges');
+
+					const chipElement = document.createElement('div');
+					chipElement.className = 'chipEvent';
+					if (eventIsPassed) {
+						buttonSave.setAttribute('disabled', '');
+						deleteButton.setAttribute('disabled', '');
+						duplicateButton.setAttribute('disabled', '');
+						chipElement.textContent = 'Date de publication passé';
+						badges.appendChild(chipElement);
+					}
+
+					whereToAppend.appendChild(fakeDiv);
+					whereToAppend.appendChild(buttonSave);
+				}
+			}
+			killLoadingSpinner(2);
+		}
+
+		async function appearEventToCreate(data = '', type = '') {
+			appearLoadingSpinner(2);
+			const keysEvent = formatEvent([], 'Event', 0, true);
+			const event = {};
+			const allFields = await getField(event, keysEvent, true);
+
+			function moveKeyToTheEnd(key) {
+				const positionOfSearchedKey = keysEvent.indexOf(key);
+				keysEvent.splice(positionOfSearchedKey, 1);
+				keysEvent.push(key);
+			}
+
+			const modalInBigContainer = document.createElement('div');
+			modalInBigContainer.className = 'killable';
+			modalInBigContainer.id = 'modal-in-big-event-container';
+			const modalInBig = document.createElement('div');
+			modalInBig.id = 'modal-in-big-event';
+			modalInBig.innerHTML = `
+						<div slot="headline">
+							<h1>Création</h1>
+							<div class="badges">
+							</div>
+						</div>
+						<div slot="content" id="modal-content-event">
+							<div id="event-fields-in-big"></div>
+						</div>
+						<div slot="actions">
+						</div>
+						`;
+
+			allFields.forEach((field) => {
+				modalInBig.querySelector('#event-fields-in-big').appendChild(field);
+			});
+
+			const fakeDiv = document.createElement('div');
+			fakeDiv.classList.add('width-100');
+			fakeDiv.style.display = 'flex';
+			fakeDiv.style.justifyContent = 'space-between';
+			fakeDiv.style.gap = '0.5vw';
+
+			const repeatHolder = document.createElement('div');
+			repeatHolder.style.position = 'relative';
+			repeatHolder.classList.add('width-100');
+
+			const repeatButton = document.createElement('md-outlined-button');
+			repeatButton.textContent = 'Répéter';
+			repeatButton.id = 'repeat-button-create';
+
+			const repeatMenu = document.createElement('md-menu');
+			repeatMenu.id = 'repeat-menu-create';
+			repeatMenu.innerHTML = `
+				<md-menu-item id="repeat-menu-item-create-0" value="0" selected>Aucune répétition</md-menu-item>
+				<md-menu-item id="repeat-menu-item-create-1" value="1">Tous les jours</md-menu-item>
+				<md-menu-item id="repeat-menu-item-create-2" value="2">Toutes les semaines</md-menu-item>
+				<md-menu-item id="repeat-menu-item-create-3" value="3">Toutes les deux semaines</md-menu-item>
+				<md-menu-item id="repeat-menu-item-create-4" value="4">Tous les mois</md-menu-item>
+				<md-menu-item id="repeat-menu-item-create-5" value="5">Tous les ans</md-menu-item>
+				<label style="display: flex; width: 100%; justify-content: center; padding: 5%;">
+					Jusqu'au : <input type="date" id="repeat-menu-item-create-input-date">
+				</label>
+			`;
+			repeatMenu.setAttribute('anchor', 'repeat-button-create');
+			repeatMenu.setAttribute('anchor-corner', 'bottom-start');
+
+			repeatMenu.querySelectorAll('md-menu-item').forEach((item) => {
+				item.addEventListener('click', () => {
+					const repeatValue = item.getAttribute('value');
+					const repeatText = item.textContent;
+					const repeatButton = document.querySelector('#repeat-button-create');
+					repeatButton.setAttribute('value', repeatValue);
+					repeatMenu.querySelectorAll('md-menu-item').forEach((item) => {
+						item.removeAttribute('selected');
+					});
+					item.setAttribute('selected', '');
+					repeatMenu.open = false;
+				});
+			});
+
+			repeatButton.addEventListener('click', () => {
+				repeatMenu.open = !repeatMenu.open;
+			});
+
+			repeatHolder.appendChild(repeatButton);
+			repeatHolder.appendChild(repeatMenu);
+			fakeDiv.appendChild(repeatHolder);
+
+			const occurrenceHolder = document.createElement('div');
+			occurrenceHolder.style.position = 'relative';
+			occurrenceHolder.classList.add('width-100');
+
+			const occurrenceButton = document.createElement('md-outlined-button');
+			occurrenceButton.textContent = 'Nouvelle Occurrence';
+
+			occurrenceButton.addEventListener('click', () => {
+				const divOccurrenceContainer = document.createElement('div');
+				divOccurrenceContainer.classList.add('occurrence-container');
+				const field1 = document.querySelector('#event-content-reseau').cloneNode(true);
+				field1.querySelectorAll('option').forEach((option) => {
+					option.removeAttribute('selected');
+					if (document.querySelector('#event-content-reseau').value == option.value) {
+						option.setAttribute('selected', '');
+					}
+				});
+				field1.id = 'event-content-occurrence1';
+
+				const field2 = document.querySelector('#event-content-date').cloneNode(true);
+				field2.id = 'event-content-occurrence2';
+
+				const field3 = document.querySelector('#event-content-heurePublication').cloneNode(true);
+				field3.id = 'event-content-occurrence3';
+
+				const field4 = document.querySelector('#event-content-titre').cloneNode(true);
+				field4.id = 'event-content-occurrence4';
+
+				const field5 = document.querySelector('#event-content-type').cloneNode(true);
+				field5.querySelectorAll('option').forEach((option) => {
+					option.removeAttribute('selected');
+					if (document.querySelector('#event-content-type').value == option.value) {
+						option.setAttribute('selected', '');
+					}
+				});
+				field5.id = 'event-content-occurrence5';
+
+				divOccurrenceContainer.appendChild(field1);
+				divOccurrenceContainer.appendChild(field2);
+				divOccurrenceContainer.appendChild(field3);
+				divOccurrenceContainer.appendChild(field4);
+				divOccurrenceContainer.appendChild(field5);
+
+				const deleteIcon = document.createElement('md-outlined-icon-button');
+				deleteIcon.innerHTML = '<md-icon> delete </md-icon>';
+
+				deleteIcon.addEventListener('click', () => {
+					divOccurrenceContainer.remove();
+				});
+
+				divOccurrenceContainer.appendChild(deleteIcon);
+
+				occurrenceHolder.appendChild(divOccurrenceContainer);
+			});
+
+			fakeDiv.appendChild(occurrenceButton);
+
+			const closeButton = document.createElement('md-outlined-button');
+			closeButton.textContent = 'Fermer';
+			closeButton.addEventListener('click', () => {
+				killAll();
+			});
+			fakeDiv.appendChild(closeButton);
+
+			const buttonCreate = document.createElement('md-filled-tonal-button');
+			buttonCreate.textContent = 'Créer';
+			buttonCreate.addEventListener('click', () => {
+				appearLoadingSpinner(1);
+				let eventData = {};
+
+				const allElements = modalInBig.querySelector('#event-fields-in-big').querySelectorAll('.event-content-field');
+				allElements.forEach((element) => {
+					eventData[element.id.split('-')[2]] = element.value;
+					if (element.required == true && element.value == '') {
+						element.style.border = '1px solid red';
+						popUp('red', 3000, "Création de l'événement", 'Veuillez remplir tous les champs obligatoires', 'error', true);
+						killLoadingSpinner(1);
+						throw new Error('Veuillez remplir tous les champs obligatoires');
+					} else {
+						element.style.border = '';
+					}
+				});
+				popUp('base', 1500, "Création de l'événement", "L'événement est en cours de création", 'hourglass');
+				// CHANGEMENT DE L'ORDRE DES CLE POUR CORRESPONDRE AU TABLEAU
+
+				moveKeyToTheEnd('id');
+
+				let eventRepeatData = {};
+
+				const allOccurrence = occurrenceHolder.querySelectorAll('.occurrence-container');
+				allOccurrence.forEach((occurrence, index) => {
+					const allElements = occurrence.querySelectorAll('.event-content-field');
+					let occurrenceData = {};
+					allElements.forEach((element) => {
+						occurrenceData[element.id.split('-')[2]] = element.value;
+					});
+					eventRepeatData[index] = occurrenceData;
+				});
+
+				eventRepeatData['repeat'] = [
+					document.querySelector('#repeat-button-create').getAttribute('value'),
+					document.querySelector('#repeat-menu-item-create-input-date').value,
+				];
+
+				console.log(eventData);
+				console.log(eventRepeatData);
+
+				/*********************************************/
+				const tableauUsed = 'Objectifs ' + new Date(eventData['date']).getFullYear();
+				/*********************************************/
+
+				google.script.run
+					.withSuccessHandler(async (result) => {
+						killLoadingSpinner(1);
+						if (result[0] == 1) {
+							console.log(result);
+							try {
+								popUp('base', 1500, "Création de l'événement", "L'événement a été crée", 'celebration');
+								await DB.saveItem(dbName, 'Events', eventData);
+								updateDaysSelected(selectedDate);
+							} catch (e) {
+								popUp('red', 8000, "Création de l'événement", e.message, 'error', true);
+								console.error(e);
+							}
+						} else {
+							console.error(result);
+							popUp('red', 8000, "Création de l'événement", result, 'error', true);
+						}
+					})
+					.withFailureHandler((result) => {
+						killLoadingSpinner(1);
+						popUp('base', 8000, "Modification de l'événement", result, 'error', true);
+					})
+					.createEventInCalendar(eventData, eventRepeatData, tableauUsed, keysEvent);
+			});
+
+			modalInBig.querySelector('div[slot="actions"]').appendChild(fakeDiv);
+			modalInBig.querySelector('div[slot="actions"]').appendChild(occurrenceHolder);
+			modalInBig.querySelector('div[slot="actions"]').appendChild(buttonCreate);
+			modalInBigContainer.appendChild(modalInBig);
+			document.body.appendChild(modalInBigContainer);
+			killLoadingSpinner(2);
+		}
+
+		/***************************************** Menu & Material Design ******************************************/
+
+		function registerListenerMenuButton(button, menu) {
+			const anchorEl = document.body.querySelector(button);
+			const menuEl = document.body.querySelector(menu);
+
+			anchorEl.addEventListener('click', () => {
+				menuEl.open = !menuEl.open;
+			});
+		}
+
+		document.querySelector('#create-event-button').addEventListener('click', () => {
+			appearEventToCreate();
+		});
+		//registerListenerMenuButton('#create-event-button', '#create-event-list');
+
+		async function appearCategoriesInListLeft() {
+			let allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')) || {};
+			if (allCategories.length <= 0) {
+				setTimeout(() => {
+					appearCategoriesInListLeft();
+				}, 2000);
+			} else {
+				allCategories = allCategories.value;
+				const listReseaux = document.querySelector('#listeReseaux-menu');
+				listReseaux.innerHTML = '';
+				// Boutons Tout afficher, Tout masquer, Uniquement Occupées
+				const boutonToutAfficher = document.createElement('md-filled-tonal-button');
+				boutonToutAfficher.textContent = 'Tout afficher';
+
+				const boutonToutMasquer = document.createElement('md-filled-tonal-button');
+				boutonToutMasquer.textContent = 'Tout masquer';
+
+				const boutonUniquementOccupes = document.createElement('md-filled-tonal-button');
+				boutonUniquementOccupes.textContent = 'Uniquement Occupées';
+
+				listReseaux.appendChild(boutonToutAfficher);
+				listReseaux.appendChild(boutonToutMasquer);
+				listReseaux.appendChild(boutonUniquementOccupes);
+
+				boutonToutAfficher.addEventListener('click', async () => {
+					const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value || {};
+					for (const reseau of Object.values(allCategories)) {
+						reseau.show = true;
+						let allCategoriesCopy = { ...allCategories };
+						allCategoriesCopy[reseau.id] = reseau;
+						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+					}
+
+					if (viewMode == 'week' || viewMode == 'month') {
+						document.querySelectorAll('.calendar-event').forEach((event) => {
+							event.style.height = '';
+						});
+					} else if (viewMode == 'day') {
+						document.querySelectorAll('.calendar-columns').forEach((event) => {
+							event.classList.remove('inactive');
+						});
+					}
+
+					document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
+						checkbox.setAttribute('checked', '');
+					});
+				});
+
+				boutonToutMasquer.addEventListener('click', async () => {
+					const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value || {};
+					for (const reseau of Object.values(allCategories)) {
+						reseau.show = false;
+						let allCategoriesCopy = { ...allCategories };
+						allCategoriesCopy[reseau.id] = reseau;
+						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+					}
+					if (viewMode == 'week' || viewMode == 'month') {
+						document.querySelectorAll('.calendar-event').forEach((event) => {
+							event.style.height = '0';
+						});
+					} else if (viewMode == 'day') {
+						document.querySelectorAll('.calendar-columns').forEach((event) => {
+							event.classList.add('inactive');
+						});
+					}
+					document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
+						checkbox.removeAttribute('checked');
+					});
+				});
+
+				boutonUniquementOccupes.addEventListener('click', async () => {
+					const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value || {};
+					for (const reseau of Object.values(allCategories)) {
+						if (viewMode == 'week' || viewMode == 'month') {
+							const reseauDOM = document.querySelector('.calendar-event[data-reseau="' + reseau.id + '"]');
+							const allCategoriesDOM = document.querySelectorAll('.calendar-event[data-reseau="' + reseau.id + '"]');
+							const checkboxDOM = document.querySelector('#listeReseaux-menu label md-checkbox[data-reseau="' + reseau.id + '"]');
+							if (reseauDOM) {
+								reseau.show = true;
+								allCategoriesDOM.forEach((event) => {
+									event.style.height = '';
+								});
+								checkboxDOM.setAttribute('checked', '');
+							} else {
+								reseau.show = false;
+								allCategoriesDOM.forEach((event) => {
+									event.style.height = '0';
+								});
+								checkboxDOM.removeAttribute('checked');
+							}
+						} else {
+							const columnDOM = document.querySelector('.calendar-columns[data-identifier="' + reseau.id + '"]');
+							const checkboxDOM = document.querySelector('#listeReseaux-menu label md-checkbox[data-reseau="' + reseau.id + '"]');
+							if (columnDOM) {
+								reseau.show = true;
+								columnDOM.classList.remove('inactive');
+								checkboxDOM.setAttribute('checked', '');
+							} else {
+								reseau.show = false;
+								columnDOM.classList.add('inactive');
+								checkboxDOM.removeAttribute('checked');
+							}
+						}
+						let allCategoriesCopy = { ...allCategories };
+						allCategoriesCopy[reseau.id] = reseau;
+						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+					}
+				});
+
+				for (const reseau in listeCategoriesJSON) {
+					let allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value || {};
+					const reseauLabel = document.createElement('label');
+					const reseauCheckbox = document.createElement('md-checkbox');
+					reseauCheckbox.dataset.reseau = reseau;
+					reseauCheckbox.setAttribute('touch-target', 'wrapper');
+					const result = allCategories[reseau];
+					if (result && result.show) {
+						reseauCheckbox.setAttribute('checked', '');
+					}
+					reseauLabel.appendChild(reseauCheckbox);
+					reseauLabel.appendChild(document.createTextNode(reseau));
+					listReseaux.appendChild(reseauLabel);
+
+					reseauCheckbox.addEventListener('change', async (event) => {
+						const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value;
+						const reseauToChange = allCategories[reseau];
+
+						if (!reseauToChange) {
+							event.target.checked = !event.target.checked;
+							console.error('Reseau non trouvé : ', reseau);
+							console.error('Liste des reseaux : ', allCategories);
+						} else {
+							console.log('Reseau à changer : ', reseauToChange);
+							console.log(reseauCheckbox.checked);
+							reseauToChange.show = reseauCheckbox.checked;
+							let allCategoriesCopy = { ...allCategories };
+							allCategoriesCopy[reseau] = reseauToChange;
+							await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+
+							if (viewMode == 'week' || viewMode == 'month') {
+								document.querySelectorAll('.calendar-event').forEach((event) => {
+									if (event.dataset.reseau == reseau) {
+										event.style.height = reseauCheckbox.checked ? '' : '0';
+									}
+								});
+							} else {
+								document.querySelectorAll('.calendar-columns').forEach((event) => {
+									if (event.dataset.identifier == reseau) {
+										event.classList.toggle('inactive');
+									}
+								});
+							}
+						}
+					});
 				}
 			}
 		}
-	}
 
-	generateListReseauColor();
+		// Gestion des boutons menu droite
 
-	// Gestion du Bouton de la liste des couleurs des reseaux
-	let isWindowListenerAddedColorEventBtn = false;
+		const changeThemeButton = document.querySelector('#change-theme-button');
 
-	function windowClickListenerColor(event) {
-		if (!colorEventList.contains(event.target) && !colorEventBtn.contains(event.target)) {
-			colorEventList.dataset.open = 'false';
-			window.removeEventListener('click', windowClickListenerColor);
-			isWindowListenerAddedColorEventBtn = false;
-			popUp('base', 3000, 'Les couleurs des reseaux ont été modifiées', '', 'info');
+		changeThemeButton.addEventListener('click', () => {
+			document.querySelector('html').toggleAttribute('dark');
+			DB.saveItem(dbName, 'Preferences', { id: 'darkMode', darkMode: document.querySelector('html').hasAttribute('dark') });
+		});
+
+		async function generateListElementToShow() {
+			const allKeys = await DB.getItem(dbName, 'Preferences', 'whatToShow');
+			if (!allKeys) {
+				setTimeout(() => {
+					generateListElementToShow();
+				}, 2000);
+			}
+
+			const keysArray = Object.values(Object.values(allKeys)[1]);
+			const keysEvent = keysArray.filter((key) => {
+				return key.id;
+			});
+			const title = document.createElement('div');
+			title.textContent = 'Liste Éléments';
+			title.className = 'titleList';
+			elementToShowList.appendChild(title);
+			if (keysEvent.length <= 0) {
+				setTimeout(() => {
+					generateListElementToShow();
+				}, 2000);
+			}
+			keysEvent.forEach((key) => {
+				const element = document.createElement('label');
+				const mdCheckbox = document.createElement('md-checkbox');
+				mdCheckbox.dataset.tableau = 'Event';
+				mdCheckbox.id = key.id;
+				if (key.selected) {
+					mdCheckbox.setAttribute('checked', '');
+				}
+				mdCheckbox.setAttribute('touch-target', 'wrapper');
+
+				element.appendChild(mdCheckbox);
+				const spanValue = document.createElement('span');
+				spanValue.textContent = formatString(key.value);
+				element.appendChild(spanValue);
+
+				elementToShowList.appendChild(element);
+			});
+
+			function registerChangeCheckbox() {
+				elementToShowList.querySelectorAll('md-checkbox').forEach((checkbox) => {
+					checkbox.addEventListener('change', async (event) => {
+						isEditedShowValue = true;
+						const key = event.target.id;
+						const tableau = event.target.dataset.tableau;
+						const allKeys = await DB.getItem(dbName, 'Preferences', 'whatToShow');
+						const valueKeys = allKeys.value;
+						const keyToChange = valueKeys[key];
+						keyToChange.selected = event.target.checked;
+						await DB.saveItem(dbName, 'Preferences', { id: 'whatToShow', value: valueKeys });
+					});
+				});
+			}
+
+			registerChangeCheckbox();
 		}
-	}
 
-	colorEventBtn.addEventListener('click', () => {
-		colorEventList.dataset.open = colorEventList.dataset.open === 'true' ? 'false' : 'true';
+		// Gestion du Bouton de la liste des éléments à afficher
 
-		if (!isWindowListenerAddedColorEventBtn) {
-			window.addEventListener('click', windowClickListenerColor);
-			isWindowListenerAddedColorEventBtn = true;
+		let isWindowListenerAddedShowBtn = false;
+		let isEditedShowValue = false;
+
+		function windowClickListener(event) {
+			if (!elementToShowList.contains(event.target) && !elementToShowBtn.contains(event.target)) {
+				elementToShowList.dataset.open = 'false';
+				if (isEditedShowValue) {
+					isEditedShowValue = false;
+					displayEvents();
+				}
+
+				window.removeEventListener('click', windowClickListener);
+				isWindowListenerAddedShowBtn = false;
+				popUp('base', 3000, 'Les éléments à afficher ont été modifiés', '', 'info');
+			}
 		}
-	});
 
-	// Gestions des Tabs Menu de Droite
+		elementToShowBtn.addEventListener('click', () => {
+			elementToShowList.dataset.open = elementToShowList.dataset.open === 'true' ? 'false' : 'true';
 
-	const tabsMenuRight = document.querySelector('#menu-right md-tabs');
-	const tabContent = document.querySelector('#menu-right div#content-tab');
-	const tabSettings = document.querySelector('#menu-right div#settings-tab');
-
-	// Initialisation des tabs
-	tabSettings.style.display = 'none';
-
-	tabsMenuRight.addEventListener('change', (event) => {
-		if (tabContent.hasAttribute('hidden')) {
-			tabContent.style.display = '';
-			tabContent.removeAttribute('hidden');
-			tabSettings.setAttribute('hidden', '');
-			tabSettings.style.display = 'none';
-		} else {
-			tabContent.style.display = 'none';
-			tabContent.setAttribute('hidden', '');
-			tabSettings.removeAttribute('hidden');
-			tabSettings.style.display = '';
-		}
-	});
-
-	document.querySelectorAll('.viewModeBtn').forEach((btn) => {
-		btn.addEventListener('click', (event) => {
-			if (!event.target.classList.contains('selected')) {
-				viewMode = event.target.getAttribute('data-view');
-				document.querySelectorAll('.viewModeBtn').forEach((btn) => btn.classList.remove('selected'));
-				event.target.classList.add('selected');
-			} else {
-				popUp('base', 8000, 'La vue est déjà sélectionnée', '', 'info');
+			if (!isWindowListenerAddedShowBtn) {
+				window.addEventListener('click', windowClickListener);
+				isWindowListenerAddedShowBtn = true;
 			}
 		});
-	});
 
-	/***************************************** Usefull Functions ******************************************/
+		// Gestion des couleurs des reseaux
 
-	/**
-	 * Vérifie si une date donnée est dans une plage horaire spécifiée.
-	 * @param {Date} date - La date à vérifier.
-	 * @param {Date} debut - La date de début de la plage horaire.
-	 * @param {Date} fin - La date de fin de la plage horaire.
-	 * @returns {boolean} - True si la date est dans la plage horaire, sinon False.
-	 * @throws {Error} - Si les paramètres ne sont pas de type Date ou s'ils ne sont pas des objets Date valides.
-	 */
-	function estDansPlageJour(date, debut, fin, day = false) {
-		if (!(date instanceof Date) || !(debut instanceof Date) || !(fin instanceof Date)) {
-			throw new Error('Tout les paramètres doivent être des objets Date.');
+		async function generateListReseauColor() {
+			const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
+			if (allCategories.length <= 0) {
+				setTimeout(() => {
+					generateListReseauColor();
+				}, 2000);
+			} else {
+				const resetColorBtn = document.createElement('md-filled-tonal-button');
+				resetColorBtn.textContent = 'Couleurs par défaut';
+				resetColorBtn.addEventListener('click', async () => {
+					for (const reseauName in allCategories.value) {
+						const reseau = allCategories.value[reseauName];
+						const couleurReseau = await ajusterCategorie(reseau.id, true);
+						reseau.couleurReseau = couleurReseau;
+
+						const couleurTexte = darkenColor(couleurReseau, 0.5);
+						reseau.couleurTexte = couleurTexte;
+						let allCategoriesCopy = { ...allCategories.value };
+						allCategoriesCopy[reseau.id] = reseau;
+						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+						document.querySelectorAll('.calendar-event').forEach((event) => {
+							if (event.dataset.reseau == reseau.id) {
+								event.querySelector('.calendar-event-content').style.backgroundColor = couleurReseau;
+								event.querySelector('.calendar-event-content').style.color = couleurTexte;
+								event.querySelector('.calendar-event-content').style.borderColor = couleurTexte;
+								document.querySelector('#color-event-list input[data-reseau="' + event.dataset.reseau + '"]').value = couleurReseau;
+							}
+						});
+					}
+				});
+
+				/*const useCustomColorLabel = document.createElement('label');
+				const useCustomColorSwitch = document.createElement('md-switch');
+				useCustomColorSwitch.id = 'use-custom-color-switch';
+				useCustomColorSwitch.setAttribute('touch-target', 'wrapper');
+				useCustomColorLabel.textContent = 'Couleurs personnalisées';
+				useCustomColorLabel.appendChild(useCustomColorSwitch);
+
+				useCustomColorSwitch.selected = (await isPreferenceUsed('useCustomColor')) || false;
+				useCustomColorSwitch.addEventListener('change', async (event) => {
+					await DB.saveItem(dbName, 'Preferences', { id: 'useCustomColor', used: useCustomColorSwitch.selected });
+					if (useCustomColorSwitch.selected) {
+						popUp(
+							'base',
+							3000,
+							'Les couleurs des reseaux ont été modifié',
+							'Désormais les couleurs utilisées seront celles définies dans le menu des couleurs reseau',
+							'info'
+						);
+						document.querySelectorAll('#color-event-list input').forEach((input) => {
+							input.removeAttribute('disabled');
+							document.querySelectorAll('.calendar-event').forEach((event) => {
+								if (event.dataset.reseau == input.dataset.reseau) {
+									event.querySelector('.calendar-event-content').style.backgroundColor = input.value;
+									event.querySelector('.calendar-event-content').style.color = darkenColor(input.value, 0.5);
+									event.querySelector('.calendar-event-content').style.borderColor = darkenColor(input.value, 0.5);
+								}
+							});
+						});
+					} else {
+						popUp('base', 3000, 'Les couleurs des reseaux sont par défaut', 'Désormais les couleurs utilisées seront celles définies par défaut', 'info');
+						document.querySelectorAll('#color-event-list input').forEach((input) => {
+							input.setAttribute('disabled', '');
+						});
+						document.querySelectorAll('.calendar-event').forEach((event) => {
+							event.querySelector('.calendar-event-content').style.backgroundColor = '';
+							event.querySelector('.calendar-event-content').style.color = '';
+							event.querySelector('.calendar-event-content').style.borderColor = '';
+						});
+					}
+				});
+
+				colorEventList.appendChild(useCustomColorLabel);*/
+
+				colorEventList.appendChild(resetColorBtn);
+				for (const reseau in listeCategoriesJSON) {
+					const reseauLabel = document.createElement('label');
+					const reseauColorBox = document.createElement('input');
+					reseauColorBox.type = 'color';
+					reseauColorBox.dataset.reseau = reseau;
+					const reseauArray = allCategories?.value[reseau];
+					if (reseauArray) {
+						reseauColorBox.value = reseauArray.couleurReseau;
+
+						reseauLabel.appendChild(reseauColorBox);
+						const spanValue = document.createElement('span');
+						spanValue.textContent = reseau;
+						reseauLabel.appendChild(spanValue);
+						colorEventList.appendChild(reseauLabel);
+
+						reseauColorBox.addEventListener('change', async (event) => {
+							const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
+							let allCategoriesCopy = { ...allCategories.value };
+							const reseauToChange = allCategoriesCopy[reseau];
+							reseauToChange.couleurReseau = reseauColorBox.value;
+							reseauToChange.couleurTexte = darkenColor(reseauColorBox.value, 0.5);
+							await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
+							document.querySelectorAll('.calendar-event').forEach((event) => {
+								if (event.dataset.reseau == reseau) {
+									event.querySelector('.calendar-event-content').style.backgroundColor = reseauColorBox.value;
+									event.querySelector('.calendar-event-content').style.color = darkenColor(reseauColorBox.value, 0.5);
+									event.querySelector('.calendar-event-content').style.borderColor = darkenColor(reseauColorBox.value, 0.5);
+								}
+							});
+						});
+					} else {
+						console.error('Catégorie non trouvée : ', reseau);
+					}
+				}
+			}
 		}
 
-		if (day) {
-			date.setHours(0, 0, 0, 0);
-			debut.setHours(0, 0, 0, 0);
-			fin.setHours(0, 0, 0, 0);
+		// Gestion du Bouton de la liste des couleurs des reseaux
+		let isWindowListenerAddedColorEventBtn = false;
+
+		function windowClickListenerColor(event) {
+			if (!colorEventList.contains(event.target) && !colorEventBtn.contains(event.target)) {
+				colorEventList.dataset.open = 'false';
+				window.removeEventListener('click', windowClickListenerColor);
+				isWindowListenerAddedColorEventBtn = false;
+				popUp('base', 3000, 'Les couleurs des reseaux ont été modifiées', '', 'info');
+			}
 		}
 
-		let timestampDate = date.getTime();
-		let timestampDebut = debut.getTime();
-		let timestampFin = fin.getTime();
+		colorEventBtn.addEventListener('click', () => {
+			colorEventList.dataset.open = colorEventList.dataset.open === 'true' ? 'false' : 'true';
 
-		if (isNaN(timestampDate) || isNaN(timestampDebut) || isNaN(timestampFin)) {
-			throw new Error('Tout les paramètres doivent être des objets Date.');
-		}
+			if (!isWindowListenerAddedColorEventBtn) {
+				window.addEventListener('click', windowClickListenerColor);
+				isWindowListenerAddedColorEventBtn = true;
+			}
+		});
 
-		// Vérifier si la valeur donnée est dans la plage horaire
-		return timestampDate >= timestampDebut && timestampDate <= timestampFin;
-	}
+		// Gestions des Tabs Menu de Droite
 
-	/**
-	 * Renvoie le premier et le dernier jour de la semaine pour une date donnée.
-	 * @param {Date} date - La date pour laquelle calculer le premier et le dernier jour de la semaine.
-	 * @returns {Array<Date>} Un tableau contenant le premier et le dernier jour de la semaine.
-	 */
-	function getFirstAndLastDayOfWeek(date) {
-		const currentDate = new Date(date);
+		const tabsMenuRight = document.querySelector('#menu-right md-tabs');
+		const tabContent = document.querySelector('#menu-right div#content-tab');
+		const tabSettings = document.querySelector('#menu-right div#settings-tab');
 
-		// Obtenir le jour de la semaine (0 pour dimanche, 1 pour lundi, etc.)
-		const dayOfWeek = currentDate.getDay();
+		// Initialisation des tabs
+		tabSettings.style.display = 'none';
 
-		// Cloner la date et réinitialiser l'heure à minuit pour éviter les problèmes d'heure
-		const firstDayOfWeek = new Date(currentDate);
-		firstDayOfWeek.setHours(0, 0, 0, 0);
+		tabsMenuRight.addEventListener('change', (event) => {
+			if (tabContent.hasAttribute('hidden')) {
+				tabContent.style.display = '';
+				tabContent.removeAttribute('hidden');
+				tabSettings.setAttribute('hidden', '');
+				tabSettings.style.display = 'none';
+			} else {
+				tabContent.style.display = 'none';
+				tabContent.setAttribute('hidden', '');
+				tabSettings.removeAttribute('hidden');
+				tabSettings.style.display = '';
+			}
+		});
 
-		// Définir le premier jour de la semaine (lundi)
-		firstDayOfWeek.setDate(currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-
-		// Cloner la date pour obtenir le dernier jour de la semaine (dimanche)
-		const lastDayOfWeek = new Date(firstDayOfWeek);
-		lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
-
-		return [firstDayOfWeek, lastDayOfWeek];
-	}
-
-	/**
-	 * Affiche une fenêtre contextuelle avec un message personnalisé.
-	 * @param {string} type - Le type de la fenêtre contextuelle : green,red et yellow (par défaut: 'green').
-	 * @param {number} time - La durée d'affichage de la fenêtre contextuelle en millisecondes (par défaut: 8000).
-	 * @param {string} titre - Le titre de la fenêtre contextuelle.
-	 * @param {string} message - Le message de la fenêtre contextuelle.
-	 * @param {string} google_icon - L'icône Google Font à afficher dans la fenêtre contextuelle.
-	 */
-	function popUp(type = 'base', time = 8000, titre = '', message = '', google_icon = '', copy = false) {
-		const google_icon_svg = `<span class="material-symbols-rounded">${google_icon}</span>`;
-		const errorContainer = document.createElement('div');
-		errorContainer.classList.add('popup-container');
-
-		const errorNotifContainer = document.createElement('div');
-		errorNotifContainer.classList.add(`${type}-notif`);
-		if (typeof message === 'object') {
-			message = JSON.stringify(message, null, 2);
-		}
-
-		if (type == 'red') {
-			console.error(titre + ' : ' + message);
-		}
-
-		const ContentContainer = document.createElement('div');
-
-		if (copy == true && type == 'red') {
-			ContentContainer.innerHTML = `<span id="title-popup">${google_icon_svg}${titre}</span><br><span id="content-popup">${message}<br><md-outlined-button class="width-100">Copier l'erreur</md-outlined-button></span>`;
-
-			ContentContainer.querySelector('md-outlined-button').addEventListener('click', () => {
-				if (navigator.clipboard) {
-					navigator.clipboard.writeText(message).then(
-						function () {
-							console.log('Texte copié dans le presse-papiers : ' + message);
-							alert(
-								'Erreur Copié dans le presse-papiers, pour résoudre ce problème veuillez contacter Alexis Thierry-Bellefond ( alexis.thierry-bellefond@paris.fr )'
-							);
-						},
-						function (err) {
-							console.error('Erreur lors de la copie dans le presse-papiers', err);
-						}
-					);
+		document.querySelectorAll('.viewModeBtn').forEach((btn) => {
+			btn.addEventListener('click', async (event) => {
+				if (event.target.getAttribute('data-selected') == 'false') {
+					viewMode = event.target.getAttribute('data-view');
+					await DB.saveItem(dbName, 'Preferences', { id: 'viewMode', value: viewMode, used: document.querySelector('#keep-viewMode-preference md-switch').selected });
+					document.querySelectorAll('.viewModeBtn').forEach((btn) => {
+						btn.classList.remove('selected');
+						btn.setAttribute('data-selected', false);
+					});
+					event.target.setAttribute('data-selected', true);
+					event.target.classList.add('selected');
+					updateDaysSelected(selectedDate);
 				} else {
-					console.error("L'API du presse-papiers n'est pas supportée par ce navigateur.");
+					popUp('base', 4000, 'La vue est déjà sélectionnée', '', 'info');
 				}
 			});
-		} else {
-			ContentContainer.innerHTML = `<span id="title-popup">${google_icon_svg}${titre}</span><br><span id="content-popup">${message}</span>`;
+		});
+
+		/***************************************** Usefull Functions ******************************************/
+
+		/**
+		 * Vérifie si une date donnée est dans une plage horaire spécifiée.
+		 * @param {Date} date - La date à vérifier.
+		 * @param {Date} debut - La date de début de la plage horaire.
+		 * @param {Date} fin - La date de fin de la plage horaire.
+		 * @returns {boolean} - True si la date est dans la plage horaire, sinon False.
+		 * @throws {Error} - Si les paramètres ne sont pas de type Date ou s'ils ne sont pas des objets Date valides.
+		 */
+		function estDansPlageJour(date, debut, fin, day = false) {
+			const oldDate = date;
+			const oldDebut = debut;
+			const oldFin = fin;
+			date = new Date(date);
+			debut = new Date(debut);
+			fin = new Date(fin);
+			if (!(date instanceof Date)) {
+				console.error("Le paramètre date n'est pas une date", oldDate);
+				return false;
+			}
+			if (!(debut instanceof Date)) {
+				console.error("Le paramètre debut n'est pas une date", oldDebut);
+				return false;
+			}
+
+			if (!(fin instanceof Date)) {
+				console.error("Le paramètre fin n'est pas une date", oldFin);
+				return false;
+			}
+
+			if (day) {
+				date.setHours(0, 0, 0, 0);
+				debut.setHours(0, 0, 0, 0);
+				fin.setHours(0, 0, 0, 0);
+			}
+
+			let timestampDate = date.getTime();
+			let timestampDebut = debut.getTime();
+			let timestampFin = fin.getTime();
+			if (isNaN(timestampDate) || isNaN(timestampDebut) || isNaN(timestampFin)) {
+				console.error('Tout les paramètres doivent être des objets Date.');
+				return false;
+			}
+
+			// Vérifier si la valeur donnée est dans la plage horaire
+			return timestampDate >= timestampDebut && timestampDate <= timestampFin;
 		}
 
-		errorNotifContainer.appendChild(ContentContainer);
-		errorContainer.appendChild(errorNotifContainer);
-		document.body.appendChild(errorContainer);
-		errorContainer.animate(
-			[
-				{
-					opacity: '0.2',
-					bottom: '-30%',
-				},
-				{
-					opacity: '1',
-					bottom: '2vh',
-				},
-			],
-			{
-				duration: 500,
-				fill: 'forwards',
-			}
-		);
+		/**
+		 * Renvoie le premier et le dernier jour de la semaine pour une date donnée.
+		 * @param {Date} date - La date pour laquelle calculer le premier et le dernier jour de la semaine.
+		 * @returns {Array<Date>} Un tableau contenant le premier et le dernier jour de la semaine.
+		 */
+		function getFirstAndLastDayOfWeek(date) {
+			const currentDate = new Date(date);
 
-		setTimeout(() => {
+			// Obtenir le jour de la semaine (0 pour dimanche, 1 pour lundi, etc.)
+			const dayOfWeek = currentDate.getDay();
+
+			// Cloner la date et réinitialiser l'heure à minuit pour éviter les problèmes d'heure
+			const firstDayOfWeek = new Date(currentDate);
+			firstDayOfWeek.setHours(0, 0, 0, 0);
+
+			// Définir le premier jour de la semaine (lundi)
+			firstDayOfWeek.setDate(currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+
+			// Cloner la date pour obtenir le dernier jour de la semaine (dimanche)
+			const lastDayOfWeek = new Date(firstDayOfWeek);
+			lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+
+			return [firstDayOfWeek, lastDayOfWeek];
+		}
+
+		/**
+		 * Affiche une fenêtre contextuelle avec un message personnalisé.
+		 * @param {string} type - Le type de la fenêtre contextuelle : green,red et yellow (par défaut: 'green').
+		 * @param {number} time - La durée d'affichage de la fenêtre contextuelle en millisecondes (par défaut: 8000).
+		 * @param {string} titre - Le titre de la fenêtre contextuelle.
+		 * @param {string} message - Le message de la fenêtre contextuelle.
+		 * @param {string} google_icon - L'icône Google Font à afficher dans la fenêtre contextuelle.
+		 */
+		function popUp(type = 'base' || 'red', time = 8000, titre = '', message = '', google_icon = '', copy = false) {
+			const google_icon_svg = `<span class="material-symbols-rounded">${google_icon}</span>`;
+			const errorContainer = document.createElement('div');
+			errorContainer.classList.add('popup-container');
+
+			const errorNotifContainer = document.createElement('div');
+			errorNotifContainer.classList.add(`${type}-notif`);
+			if (typeof message === 'object') {
+				message = JSON.stringify(message, null, 2);
+			}
+
+			if (type == 'red') {
+				console.error(titre + ' : ' + message);
+			}
+
+			const ContentContainer = document.createElement('div');
+
+			if (copy == true && type == 'red') {
+				ContentContainer.innerHTML = `<span id="title-popup">${google_icon_svg}${titre}</span><br><span id="content-popup">${message}<br><md-outlined-button class="width-100">Copier l'erreur</md-outlined-button></span>`;
+
+				ContentContainer.querySelector('md-outlined-button').addEventListener('click', () => {
+					if (navigator.clipboard) {
+						navigator.clipboard.writeText(message).then(
+							function () {
+								console.log('Texte copié dans le presse-papiers : ' + message);
+								alert(
+									'Erreur Copié dans le presse-papiers, pour résoudre ce problème veuillez contacter Alexis Thierry-Bellefond ( alexis.thierry-bellefond@paris.fr )'
+								);
+							},
+							function (err) {
+								console.error('Erreur lors de la copie dans le presse-papiers', err);
+							}
+						);
+					} else {
+						console.error("L'API du presse-papiers n'est pas supportée par ce navigateur.");
+					}
+				});
+			} else {
+				ContentContainer.innerHTML = `<span id="title-popup">${google_icon_svg}${titre}</span><br><span id="content-popup">${message}</span>`;
+			}
+
+			errorNotifContainer.appendChild(ContentContainer);
+			errorContainer.appendChild(errorNotifContainer);
+			document.body.appendChild(errorContainer);
+			let numberOfNotificationAleardyDisplayed = document.querySelectorAll('.popup-container').length;
+			numberOfNotificationAleardyDisplayed > 5 ? (numberOfNotificationAleardyDisplayed = 0) : numberOfNotificationAleardyDisplayed;
 			errorContainer.animate(
 				[
 					{
-						opacity: '1',
-						bottom: '2vh',
-					},
-					{
 						opacity: '0.2',
 						bottom: '-30%',
+					},
+					{
+						opacity: '1',
+						bottom: '1' + numberOfNotificationAleardyDisplayed + 'vh',
 					},
 				],
 				{
@@ -1132,176 +2351,317 @@
 					fill: 'forwards',
 				}
 			);
+
 			setTimeout(() => {
-				errorContainer.remove();
-			}, 500);
-		}, time);
-	}
-
-	/**
-	 * Compare deux objets JavaScript ou tableaux pour l'égalité, en prenant en compte leurs propriétés et valeurs imbriquées.
-	 * Gère également un cas particulier où la valeur de chaîne "(8) La Bulle" est traitée comme équivalente à "(8) Buvette - La Bulle".
-	 * @param {object|array} objet1 - Le premier objet ou tableau à comparer. Peut être de tout type.
-	 * @param {object|array} objet2 - Le deuxième objet ou tableau à comparer. Doit être du même type que objet1.
-	 * @return {boolean} Un booléen indiquant si les deux objets sont égaux ou non. S'ils sont égaux, renvoie true ; sinon, renvoie false.
-	 */
-	function comparerObjets(objet1, objet2) {
-		return _.isEqual(objet1, objet2);
-	}
-
-	function convertAbregedStringToDate(dateString, lineInTable = null) {
-		const monthsMap = {
-			'janv.': 0,
-			'févr.': 1,
-			mars: 2,
-			'avr.': 3,
-			mai: 4,
-			juin: 5,
-			'juil.': 6,
-			août: 7,
-			'sept.': 8,
-			'oct.': 9,
-			'nov.': 10,
-			'déc.': 11,
-			janvier: 0,
-			février: 1,
-			avril: 3,
-			juillet: 6,
-			septembre: 8,
-			octobre: 9,
-			novembre: 10,
-			décembre: 11,
-		};
-
-		try {
-			let dateSplit = dateString.split(' ');
-			let day = parseInt(dateSplit[1]);
-			let month = monthsMap[dateSplit[2]];
-			let year = parseInt(dateSplit[3]) + 2000;
-			// Création de la date en spécifiant l'heure à midi pour éviter les problèmes de fuseau horaire
-			return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-		} catch (error) {
-			console.log('Erreur à la ligne ' + lineInTable);
-			console.log(dateString);
-			console.log('Erreur : ' + error);
-			return new Error('Erreur' + error);
+				errorContainer.animate(
+					[
+						{
+							opacity: '1',
+							bottom: '2vh',
+						},
+						{
+							opacity: '0.2',
+							bottom: '-30%',
+						},
+					],
+					{
+						duration: 500,
+						fill: 'forwards',
+					}
+				);
+				setTimeout(() => {
+					errorContainer.remove();
+				}, 500);
+			}, time);
 		}
-	}
 
-	function convertDateToAbregedString(date) {
-		const dateUsed = new Date(date);
-		const monthsMap = {
-			0: 'janv.',
-			1: 'févr.',
-			2: 'mars',
-			3: 'avr.',
-			4: 'mai',
-			5: 'juin',
-			6: 'juil.',
-			7: 'août',
-			8: 'sept.',
-			9: 'oct.',
-			10: 'nov.',
-			11: 'déc.',
-		};
-
-		const dayMap = {
-			lundi: 'lun.',
-			mardi: 'mar.',
-			mercredi: 'mer.',
-			jeudi: 'jeu.',
-			vendredi: 'ven.',
-			samedi: 'sam.',
-			dimanche: 'dim.',
-		};
-		try {
-			let dayNumber = dateUsed.getDate() < 10 ? '0' + dateUsed.getDate() : dateUsed.getDate();
-			return `${dayMap[dateUsed.toLocaleDateString('fr-FR', { weekday: 'long' })]} ${dayNumber} ${monthsMap[dateUsed.getMonth()]} ${dateUsed.getFullYear() - 2000}`;
-		} catch (error) {
-			console.log('Erreur : ' + error);
-			return new Error('Erreur' + error);
+		/**
+		 * Compare deux objets JavaScript ou tableaux pour l'égalité, en prenant en compte leurs propriétés et valeurs imbriquées.
+		 * Gère également un cas particulier où la valeur de chaîne "(8) La Bulle" est traitée comme équivalente à "(8) Buvette - La Bulle".
+		 * @param {object|array} objet1 - Le premier objet ou tableau à comparer. Peut être de tout type.
+		 * @param {object|array} objet2 - Le deuxième objet ou tableau à comparer. Doit être du même type que objet1.
+		 * @return {boolean} Un booléen indiquant si les deux objets sont égaux ou non. S'ils sont égaux, renvoie true ; sinon, renvoie false.
+		 */
+		function comparerObjets(objet1, objet2) {
+			return _.isEqual(objet1, objet2);
 		}
-	}
 
-	function formatDate(date) {
-		const year = date.getFullYear();
-		const month = (date.getMonth() + 1).toString().padStart(2, '0');
-		const day = date.getDate().toString().padStart(2, '0');
-		return `${year}-${month}-${day}`;
-	}
+		function convertAbregedStringToDate(dateString, tableau, lineInTable = null) {
+			const monthsMap = {
+				'janv.': 0,
+				'févr.': 1,
+				mars: 2,
+				'avr.': 3,
+				mai: 4,
+				juin: 5,
+				'juil.': 6,
+				août: 7,
+				'sept.': 8,
+				'oct.': 9,
+				'nov.': 10,
+				'déc.': 11,
+				janvier: 0,
+				février: 1,
+				avril: 3,
+				juillet: 6,
+				septembre: 8,
+				octobre: 9,
+				novembre: 10,
+				décembre: 11,
+			};
 
-	/**
-	 * Assombrit une couleur donnée d'un facteur donné.
-	 * @param {string} color - La couleur à assombrir, au format rgb() ou #xxxxxx.
-	 * @param {number} factor - Le facteur d'assombrissement, entre 0 et 1.
-	 * @return {string} La couleur assombrie, au format rgb() ou #xxxxxx.
-	 * @throws {Error} Si la couleur n'est pas au format rgb() ou #xxxxxx.
-	 * TODO: Gérer l’exception si il n'y a pas de couleur ou facteur.
-	 */
-	function darkenColor(color, factor) {
-		if (color != undefined) {
-			let values;
-			if (color.startsWith('rgb(')) {
-				values = color
-					.replace(/^rgb\(|\)$/g, '')
-					.split(',')
-					.map(Number);
-			} else if (color.startsWith('#')) {
-				values = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
+			try {
+				let dateSplit = dateString.split(' ');
+				let day = parseInt(dateSplit[1]);
+				let month = parseInt(dateSplit[2]) - 1;
+				let year = parseInt(tableau.split(' ')[1]);
+				//console.log('Date : ', day, month, year, dateString);
+				// Création de la date en spécifiant l'heure à midi pour éviter les problèmes de fuseau horaire
+				return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+			} catch (error) {
+				console.log('Erreur à la ligne ' + lineInTable);
+				console.log(dateString);
+				console.log('Erreur : ' + error);
+				return new Error('Erreur' + error);
+			}
+		}
+
+		function convertDateToAbregedString(date) {
+			const dateUsed = new Date(date);
+			const monthsMap = {
+				0: 'janv.',
+				1: 'févr.',
+				2: 'mars',
+				3: 'avr.',
+				4: 'mai',
+				5: 'juin',
+				6: 'juil.',
+				7: 'août',
+				8: 'sept.',
+				9: 'oct.',
+				10: 'nov.',
+				11: 'déc.',
+			};
+
+			const dayMap = {
+				lundi: 'lun.',
+				mardi: 'mar.',
+				mercredi: 'mer.',
+				jeudi: 'jeu.',
+				vendredi: 'ven.',
+				samedi: 'sam.',
+				dimanche: 'dim.',
+			};
+			try {
+				let dayNumber = dateUsed.getDate() < 10 ? '0' + dateUsed.getDate() : dateUsed.getDate();
+				return `${dayMap[dateUsed.toLocaleDateString('fr-FR', { weekday: 'long' })]} ${dayNumber} ${monthsMap[dateUsed.getMonth()]} ${dateUsed.getFullYear() - 2000}`;
+			} catch (error) {
+				console.log('Erreur : ' + error);
+				return new Error('Erreur' + error);
+			}
+		}
+
+		function getWeekNumber(date) {
+			const startOfYear = new Date(date.getFullYear(), 0, 1);
+			const dayOfYear = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
+			return Math.ceil(dayOfYear / 7);
+		}
+
+		function formatDate(date) {
+			const year = date.getFullYear();
+			const month = (date.getMonth() + 1).toString().padStart(2, '0');
+			const day = date.getDate().toString().padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		}
+
+		/**
+		 * Assombrit une couleur donnée d'un facteur donné.
+		 * @param {string} color - La couleur à assombrir, au format rgb() ou #xxxxxx.
+		 * @param {number} factor - Le facteur d'assombrissement, entre 0 et 1.
+		 * @return {string} La couleur assombrie, au format rgb() ou #xxxxxx.
+		 * @throws {Error} Si la couleur n'est pas au format rgb() ou #xxxxxx.
+		 * TODO: Gérer l’exception si il n'y a pas de couleur ou facteur.
+		 */
+		function darkenColor(color, factor) {
+			if (color != undefined) {
+				let values;
+				if (color.startsWith('rgb(')) {
+					values = color
+						.replace(/^rgb\(|\)$/g, '')
+						.split(',')
+						.map(Number);
+				} else if (color.startsWith('#')) {
+					values = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
+				} else {
+					throw new Error('Unsupported color format', color);
+				}
+				const darkenedValues = values.map((value) => Math.max(0, Math.floor(value * (1 - factor))));
+				let darkenedColor;
+				if (color.startsWith('rgb(')) {
+					darkenedColor = `rgb(${darkenedValues.join(', ')})`;
+				} else if (color.startsWith('#')) {
+					darkenedColor = `#${darkenedValues.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+				}
+				return darkenedColor;
 			} else {
-				throw new Error('Unsupported color format');
+				return '#000000';
 			}
-			const darkenedValues = values.map((value) => Math.max(0, Math.floor(value * (1 - factor))));
-			let darkenedColor;
-			if (color.startsWith('rgb(')) {
-				darkenedColor = `rgb(${darkenedValues.join(', ')})`;
-			} else if (color.startsWith('#')) {
-				darkenedColor = `#${darkenedValues.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
-			}
-			return darkenedColor;
-		} else {
-			return '#000000';
 		}
-	}
 
-	function lighterColor(color, factor) {
-		if (color !== undefined) {
-			let values;
-			if (color.startsWith('rgb(')) {
-				values = color
-					.replace(/^rgb\(|\)$/g, '')
-					.split(',')
-					.map(Number);
-			} else if (color.startsWith('#')) {
-				values = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
+		function lighterColor(color, factor) {
+			if (color !== undefined) {
+				let values;
+				if (color.startsWith('rgb(')) {
+					values = color
+						.replace(/^rgb\(|\)$/g, '')
+						.split(',')
+						.map(Number);
+				} else if (color.startsWith('#')) {
+					values = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
+				} else {
+					throw new Error('Unsupported color format', color);
+				}
+
+				const lightenedValues = values.map((value) => Math.min(255, Math.floor(value + (255 - value) * factor)));
+				let lightenedColor;
+				if (color.startsWith('rgb(')) {
+					lightenedColor = `rgb(${lightenedValues.join(', ')})`;
+				} else if (color.startsWith('#')) {
+					lightenedColor = `#${lightenedValues.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+				}
+				return lightenedColor;
 			} else {
-				throw new Error('Unsupported color format');
+				return '#FFFFFF';
 			}
-
-			const lightenedValues = values.map((value) => Math.min(255, Math.floor(value + (255 - value) * factor)));
-			let lightenedColor;
-			if (color.startsWith('rgb(')) {
-				lightenedColor = `rgb(${lightenedValues.join(', ')})`;
-			} else if (color.startsWith('#')) {
-				lightenedColor = `#${lightenedValues.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
-			}
-			return lightenedColor;
-		} else {
-			return '#FFFFFF';
 		}
-	}
 
-	// Fonction pour formater les chaînes de caractères
-	// Exemple : formatString('bonjourToutLeMonde') => 'Bonjour Tout Le Monde'
-	function formatString(inputString) {
-		let formattedString = inputString.charAt(0).toUpperCase();
-		for (let i = 1; i < inputString.length; i++) {
-			if (inputString[i] === inputString[i].toUpperCase()) {
-				formattedString += ' ' + inputString[i];
+		function killAll(killLoaderToo = true) {
+			if (killLoaderToo) {
+				document.querySelectorAll('.killable').forEach((element) => {
+					element.remove();
+				});
 			} else {
-				formattedString += inputString[i];
+				document.querySelectorAll('.killable').forEach((element) => {
+					if (!element.classList.contains('spinner')) {
+						element.remove();
+					}
+				});
 			}
 		}
-		return formattedString;
-	}
+
+		// Fonction pour formater les chaînes de caractères
+		// Exemple : formatString('bonjourToutLeMonde') => 'Bonjour Tout Le Monde'
+		function formatString(inputString) {
+			let formattedString = inputString.charAt(0).toUpperCase();
+			for (let i = 1; i < inputString.length; i++) {
+				if (inputString[i] === inputString[i].toUpperCase()) {
+					formattedString += ' ' + inputString[i];
+				} else {
+					formattedString += inputString[i];
+				}
+			}
+			return formattedString;
+		}
+
+		function errorHandler(error) {
+			console.error('Erreur : ', error);
+			popUp('red', 8000, 'Erreur', error, 'error', true);
+		}
+
+		function isNumber(value) {
+			if (value === '') {
+				return false;
+			}
+			return !isNaN(value);
+		}
+
+		// Fait apparaitre le spinner de chargement à l'appel de la fonction, sois le spinner 1 (Gros central) ou le spinner 2 (Petit en bas à droite)
+		function appearLoadingSpinner(type = 1) {
+			if (type == 1) {
+				if (!document.querySelector('.spinnerFullScreen-container')) {
+					const loaderSpinnerContainer = document.createElement('div');
+					loaderSpinnerContainer.classList.add('spinnerFullScreen-container');
+					loaderSpinnerContainer.classList.add('killable');
+					const imageSpinner = document.createElement('img');
+					imageSpinner.src = 'https://www.academieduclimat.paris/app/uploads/2023/11/blanc-transparent-endosse-2.png';
+					imageSpinner.alt = "Logo de l'Académie du Climat";
+					imageSpinner.style.width = '30%';
+					imageSpinner.style.marginBottom = '2vh';
+					const loaderSpinner = document.createElement('md-linear-progress');
+					loaderSpinner.setAttribute('indeterminate', '');
+					loaderSpinnerContainer.appendChild(imageSpinner);
+					loaderSpinnerContainer.appendChild(loaderSpinner);
+
+					document.querySelector('body').appendChild(loaderSpinnerContainer);
+					// Fonction qui permet de gérer une exeption si le chargement est trop long
+					timeoutLoading();
+				}
+			} else if (type == 2) {
+				if (!document.querySelector('.spinnerBottomRight-container')) {
+					const loaderSpinnerContainer = document.createElement('div');
+					loaderSpinnerContainer.classList.add('spinnerBottomRight-container');
+					loaderSpinnerContainer.classList.add('killable');
+					const loaderSpinner = document.createElement('md-circular-progress');
+					loaderSpinner.setAttribute('indeterminate', '');
+					loaderSpinnerContainer.appendChild(loaderSpinner);
+
+					document.querySelector('body').appendChild(loaderSpinnerContainer);
+					// Fonction qui permet de gérer une exeption si le chargement est trop long
+					timeoutLoading(2);
+				}
+			}
+		}
+		function killLoadingSpinner(type = 1) {
+			if (type == 1) {
+				if (document.querySelector('.spinnerFullScreen-container')) {
+					document.querySelector('.spinnerFullScreen-container').remove();
+				}
+			} else if (type == 2) {
+				if (document.querySelector('.spinnerBottomRight-container')) {
+					document.querySelector('.spinnerBottomRight-container').remove();
+				}
+			}
+		}
+		function timeoutLoading(type = 1) {
+			if (type == 1) {
+				if (loadingTimeoutId) {
+					clearTimeout(loadingTimeoutId);
+				}
+				loadingTimeoutId = setTimeout(function () {
+					if (document.querySelector('.spinnerFullScreen-container') || document.querySelector('.spinnerBottomRight-container')) {
+						console.log('Erreur de chargement');
+						document.querySelector('.spinnerFullScreen-container').remove();
+						document.querySelector('.spinnerBottomRight-container').remove();
+						popUp(
+							'red',
+							5000,
+							'Le chargement semble long..',
+							`Vérifiez votre connection internet et votre accès au tableau de programmation <br />Si le problème persiste veuillez contacter l'administrateur.`,
+							'warning'
+						);
+					}
+					loadingTimeoutId = undefined;
+				}, 30000);
+			} else {
+				if (loadingTimeoutId2) {
+					clearTimeout(loadingTimeoutId2);
+				}
+				loadingTimeoutId2 = setTimeout(function () {
+					if (document.querySelector('.spinnerFullScreen-container') || document.querySelector('.spinnerBottomRight-container')) {
+						console.log('Erreur de chargement');
+						document.querySelector('.spinnerFullScreen-container').remove();
+						document.querySelector('.spinnerBottomRight-container').remove();
+						popUp(
+							'red',
+							5000,
+							'Le chargement semble long..',
+							`Vérifiez votre connection internet et votre accès au tableau de programmation <br />Si le problème persiste veuillez contacter l'administrateur.`,
+							'warning'
+						);
+					}
+					loadingTimeoutId2 = undefined;
+				}, 15000);
+			}
+		}
+	})();
 </script>

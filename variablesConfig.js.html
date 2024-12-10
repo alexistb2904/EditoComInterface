@@ -3,54 +3,101 @@
 	const colonneMax = 'AE';
 
 	// Emplacement Programmation
+	const COL_SEMAINE = 0;
 	const COL_RESEAU = 1;
 	const COL_DATE = 2;
-	const COL_TITRE = 3;
-	const COL_TYPE = 4;
-	const COL_ITEMS = 5;
-	const COL_OBJECTIFS = 6;
+	const COL_HEURE_PUBLICATION = 3;
+	const COL_TITRE = 4;
+	const COL_DATE_EVENT = 5;
+	const COL_TYPE = 6;
 	const COL_ETAT_CREA = 7;
 	const COL_ETAT_EDITO = 8;
-	const COL_ETAT_PRECISION = 9;
-	const COL_ID = 22;
+	const COL_ETAT_MINIA = 9;
+	const COL_PRECISION = 10;
+	const COL_ITEMS = 11;
+	const COL_COUV_S1 = 12;
+	const COL_COUV_NONFOLLOW_S1_POURCENT = 13;
+	const COL_COUV_NONFOLLOW_S1_NB = 14;
+	const COL_LIKE_S1 = 15;
+	const COL_COMMENT_S1 = 16;
+	const COL_PARTAGE_S1 = 17;
+	const COL_ENREGISTREMENT = 18;
+	const COL_TOTAL_INTERACTION = 19;
+	const COL_ABONNE_EN_PLUS = 20;
+	const COL_VUE_MOY = 21;
+	const COL_CLIC_LIEN = 22;
+	const COL_ENGAGEMENT_S1 = 23;
+	const COL_REMARQUES = 24;
+	const COL_OLD_OBJECTIFS = 25;
+	const COL_OLD_PILLIERS_EDITO = 26;
+
+	const COL_ID = 27;
 
 	/** Listes des Reseaux **/
 
-	let listeReseauJSON = {
+	let listeCategoriesJSON = {
 		IG: {
 			id: 'IG',
-			couleur: '#FFD0C0',
+			couleur: '#ff00f7',
 			show: true,
+			ordre: 1,
+		},
+		'IG STORY': {
+			id: 'IG STORY',
+			couleur: '#ad76fe',
+			show: true,
+			ordre: 2,
 		},
 		LK: {
 			id: 'LK',
-			couleur: '#FFC0CB',
+			couleur: '#00e7eb',
 			show: true,
+			ordre: 3,
 		},
 		YT: {
 			id: 'YT',
-			couleur: '#D8C4E1',
+			couleur: '#ff0000',
 			show: true,
+			ordre: 4,
 		},
 		X: {
 			id: 'X',
-			couleur: '#E8A55E',
+			couleur: '#6b6b6b',
 			show: true,
+			ordre: 5,
 		},
 		FB: {
 			id: 'FB',
-			couleur: '#9EC7FF',
+			couleur: '#006aff',
 			show: true,
+			ordre: 6,
 		},
 		TK: {
 			id: 'TK',
 			couleur: '#C4A7FF',
 			show: true,
+			ordre: 7,
 		},
 		'GDES SEQ.': {
 			id: 'GDES SEQ.',
 			couleur: '#7DD1B3',
 			show: true,
+			ordre: 8,
 		},
+		Annulé: {
+			id: 'Annulé',
+			couleur: '#ea9648',
+			show: true,
+			ordre: 9,
+		},
+	};
+	let listeSelect = {
+		typeField: ['', 'Post/Vidéo', 'Story', 'Short', 'Live', 'A définir'],
+		itemsField: ['', 'Inspiration', 'Info Tips', 'Divertissement'],
+		oldObjectifsField: ['', 'Comment./Liker', 'Partage/Enregis.', "Elargir l'audience", "S'abonner"],
+		oldPilliersEditoField: ['', "Faire connaitre l'ADC", "Faire aimer l'ADC", "Faire venir à l'ADC", "Animer l'éco-système", 'Autre'],
+		etatCreaField: ['', 'Attente de brief', 'En créa', 'Faire valider', 'Refaire valider', 'Mettre dans le drive', 'Validé dans le drive', 'Annulé'],
+		etatEditoField: ['', 'Attente éléments', 'A écrire', 'Ecrit - à valider', 'A réécrire', 'Validé'],
+		etatMiniaField: ['', 'Attente élément', 'A faire', 'Fait - à valider', 'A refaire', 'Validé'],
 	};
 </script>
