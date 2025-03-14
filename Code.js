@@ -2,8 +2,8 @@
 function doGet() {
 	return HtmlService.createTemplateFromFile('index')
 		.evaluate()
-		.setFaviconUrl('https://www.academieduclimat.paris/app/themes/academie-du-climat/src/img/favicons/favicon-32x32.png')
-		.setTitle('Calendrier Académie du Climat')
+		.setFaviconUrl('https://www.academieduclimat.paris/app/uploads/2025/02/🧚.png')
+		.setTitle('Publications Académie du Climat')
 		.addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -28,34 +28,26 @@ function getDataFromSpreadsheet(range, sheetChosen = sheetID, filterEmpty = true
 	}
 }
 
-function convertAbregedStringToDate(dateString, lineInTable = null) {
-	const monthsMap = {
-		'janv.': 0,
-		'févr.': 1,
-		mars: 2,
-		'avr.': 3,
-		mai: 4,
-		juin: 5,
-		'juil.': 6,
-		août: 7,
-		'sept.': 8,
-		'oct.': 9,
-		'nov.': 10,
-		'déc.': 11,
-		janvier: 0,
-		février: 1,
-		avril: 3,
-		juillet: 6,
-		septembre: 8,
-		octobre: 9,
-		novembre: 10,
-		décembre: 11,
-	};
+function appendDataToSpreadsheet(range, spreadsheetId, rowsToAdd) {
+	const result = Sheets.Spreadsheets.Values.append(
+		{
+			values: rowsToAdd,
+		},
+		spreadsheetId,
+		range,
+		{
+			valueInputOption: 'RAW',
+			insertDataOption: 'INSERT_ROWS',
+		}
+	);
+	return result;
+}
 
+function convertAbregedStringToDate(dateString, lineInTable = null) {
 	try {
 		let dateSplit = dateString.split(' ');
 		let day = parseInt(dateSplit[1]);
-		let month = monthsMap[dateSplit[2]];
+		let month = parseInt(dateSplit[2]) - 1;
 		let year = parseInt(dateSplit[3]) + 2000;
 		// Création de la date en spécifiant l'heure à midi pour éviter les problèmes de fuseau horaire
 		return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
@@ -146,6 +138,7 @@ function sendTextLog(title, error, etat = 0) {
 
 function convertDateToAbregedStringFormat(date) {
 	const daysMap = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+	date = new Date(date);
 	const day = date.getUTCDate(); // Get the day of the month
 	const month = date.getUTCMonth() + 1; // Months are 0-indexed
 	const year = date.getUTCFullYear().toString().slice(-2); // Get last two digits of the year
@@ -245,15 +238,6 @@ function columnToLetter(column) {
 	return letter;
 }
 
-function addEventToCalendar(eventData) {
-	try {
-	} catch (error) {
-		Logger.log("Erreur lors de la création de l'événement : ", error.message);
-		sendTextLog("Création de l'événement", error.message);
-		return error.message;
-	}
-}
-
 function deleteEventInCalendar(eventData, keysEvent) {
 	if (!eventData) {
 		return 'Pas de données à supprimer';
@@ -282,7 +266,7 @@ function deleteEventInCalendar(eventData, keysEvent) {
 	try {
 		if (eventData) {
 			Logger.log(eventData);
-			const eventDataArray = [eventData['semaine'], 'Annulé'];
+			const eventDataArray = [eventData['mois'], eventData['semaine'], 'Annulé'];
 			if (eventDataArray == '') {
 				return 'Aucune donnée à supprimer';
 			}
@@ -357,31 +341,56 @@ function getNumeroDossier(allData) {
 	}
 }
 
+function incrementNumeroDossier(currentNumDossier) {
+	const parts = currentNumDossier.split('-');
+	const year = parts[0];
+	const num = parseInt(parts[1], 10) + 1;
+	return `${year}-${num.toString().padStart(3, '0')}`;
+}
+
+function getNombreSemaineDate(date) {
+	const startOfYear = new Date(date.getFullYear(), 0, 1);
+	const dayOfYear = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
+	return Math.ceil(dayOfYear / 7);
+}
+
 async function createEventInCalendar(eventData, eventRepeatData, tableauUsed, keysEvent) {
 	if (!eventData) {
 		return 'Pas de données à modifier';
 	}
 	Logger.log(keysEvent);
-	Logger.log("Modification de l'événement : " + eventData['id'] + ' ligne: ' + eventData['ligne'] + ': tableau ' + eventData['tableau']);
+	Logger.log(eventData);
 
+	Logger.log('Répétition : ');
+	Logger.log(eventRepeatData['repeat']);
+	Logger.log('Occurrence : ');
+	Logger.log(eventRepeatData);
 	let allData = await getDataFromSpreadsheet(tableauUsed, sheetID);
 	const numeroDossier = await getNumeroDossier(allData);
 	let toAdd = [];
 	try {
+		if (eventData['reseau'] == 'IG STORY') {
+			eventData['reseau'] = 'IG';
+			eventData['type'] = 'Story';
+		}
+		eventData['semaine'] = getNombreSemaineDate(new Date(eventData['date']));
+		eventData['mois'] = new Date(eventData['date']).toLocaleString('default', { month: 'short' });
 		eventData['id'] = numeroDossier;
+		eventData['ligne'] = allData.length + 1;
 		eventData['date'] = convertDateToAbregedStringFormat(new Date(eventData['date']));
+		Logger.log("Création de l'événement : " + eventData['id'] + ' tableau ' + eventData['tableau'] + ' ligne ' + eventData['ligne']);
 		if (eventData['heurePublication'].includes(':')) {
 			eventData['heurePublication'] =
 				eventData['heurePublication'].split(':')[0] + 'h' + (eventData['heurePublication'].split(':')[1] != '00' ? eventData['heurePublication'].split(':')[1] : '');
 		}
 		const eventDataArray = keysEvent.map((key) => eventData[key] || '');
-		eventDataArray.splice(0, 2); // Retire les 2 premiers éléments
 		if (eventDataArray == '') {
 			return 'Aucune donnée à modifier';
 		}
 		if (!Array.isArray(eventDataArray)) {
 			return "EventDataArray n'est pas un tableau..";
 		}
+		eventDataArray[2] = getNombreSemaineDate(new Date(convertAbregedStringToDate(eventData['date'])));
 		allData.push(eventDataArray);
 		toAdd.push(eventDataArray);
 	} catch (error) {
@@ -394,74 +403,155 @@ async function createEventInCalendar(eventData, eventRepeatData, tableauUsed, ke
 	// Répétition de l'événement
 	// eventRepeatData['repeat'][0] : Type de répétition
 	// eventRepeatData['repeat'][1] : Date de fin de répétition
+	let ligneInTableauADefinir = parseInt(allData.length);
+	let dernierNumeroDossier = numeroDossier;
 	if (eventRepeatData['repeat'][0] != '0') {
 		let eventDate = new Date(convertAbregedStringToDate(eventData['date']));
 		switch (eventRepeatData['repeat'][0]) {
 			case '1':
 				// Répétition journalière
+				Logger.log('Répétition journalière');
 				while (eventDate <= new Date(eventRepeatData['repeat'][1])) {
 					eventDate.setDate(eventDate.getDate() + 1);
-					Logger.log(new Date(eventRepeatData['repeat'][1]));
 					let newEvent = { ...eventData };
+					newEvent['semaine'] = getNombreSemaineDate(eventDate);
 					newEvent['date'] = convertDateToAbregedStringFormat(eventDate);
-					newEvent['id'] = getNumeroDossier(allData);
+					newEvent['mois'] = eventDate.toLocaleString('default', { month: 'short' });
+					ligneInTableauADefinir++;
+					newEvent['ligne'] = ligneInTableauADefinir;
+					dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+					newEvent['id'] = dernierNumeroDossier;
 					allData.push(newEvent);
-					toAdd.push(keysEvent.map((key) => newEvent[key] || ''));
+					let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+					toAdd.push(newEventArray);
 				}
 				break;
 			case '2':
 				// Répétition hebdomadaire
-				eventDate = new Date(eventData['date']);
+				Logger.log('Répétition hebdomadaire');
 				while (eventDate <= new Date(eventRepeatData['repeat'][1])) {
 					eventDate.setDate(eventDate.getDate() + 7);
 					let newEvent = { ...eventData };
+					newEvent['semaine'] = getNombreSemaineDate(eventDate);
 					newEvent['date'] = convertDateToAbregedStringFormat(eventDate);
-					newEvent['id'] = getNumeroDossier(allData);
+					newEvent['mois'] = eventDate.toLocaleString('default', { month: 'short' });
+					ligneInTableauADefinir++;
+					newEvent['ligne'] = ligneInTableauADefinir;
+					dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+					newEvent['id'] = dernierNumeroDossier;
 					allData.push(newEvent);
-					toAdd.push(keysEvent.map((key) => newEvent[key] || ''));
+					let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+					toAdd.push(newEventArray);
 				}
 				break;
 			case '3':
 				// Répétition bihebdomadaire
-				eventDate = new Date(eventData['date']);
+				Logger.log('Répétition bihebdomadaire');
 				while (eventDate <= new Date(eventRepeatData['repeat'][1])) {
 					eventDate.setDate(eventDate.getDate() + 14);
 					let newEvent = { ...eventData };
+					newEvent['semaine'] = getNombreSemaineDate(eventDate);
 					newEvent['date'] = convertDateToAbregedStringFormat(eventDate);
-					newEvent['id'] = getNumeroDossier(allData);
+					newEvent['mois'] = eventDate.toLocaleString('default', { month: 'short' });
+					ligneInTableauADefinir++;
+					newEvent['ligne'] = ligneInTableauADefinir;
+					dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+					newEvent['id'] = dernierNumeroDossier;
 					allData.push(newEvent);
-					toAdd.push(keysEvent.map((key) => newEvent[key] || ''));
+					let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+					toAdd.push(newEventArray);
 				}
 				break;
 			case '4':
 				// Répétition mensuelle
-				eventDate = new Date(eventData['date']);
+				Logger.log('Répétition mensuelle');
 				while (eventDate <= new Date(eventRepeatData['repeat'][1])) {
 					eventDate.setMonth(eventDate.getMonth() + 1);
 					let newEvent = { ...eventData };
+					newEvent['semaine'] = getNombreSemaineDate(eventDate);
 					newEvent['date'] = convertDateToAbregedStringFormat(eventDate);
-					newEvent['id'] = getNumeroDossier(allData);
+					newEvent['mois'] = eventDate.toLocaleString('default', { month: 'short' });
+					ligneInTableauADefinir++;
+					newEvent['ligne'] = ligneInTableauADefinir;
+					dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+					newEvent['id'] = dernierNumeroDossier;
 					allData.push(newEvent);
-					toAdd.push(keysEvent.map((key) => newEvent[key] || ''));
+					let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+					toAdd.push(newEventArray);
 				}
 				break;
 			case '5':
 				// Répétition annuelle
-				eventDate = new Date(eventData['date']);
+				Logger.log('Répétition annuelle');
 				while (eventDate <= new Date(eventRepeatData['repeat'][1])) {
 					eventDate.setFullYear(eventDate.getFullYear() + 1);
 					let newEvent = { ...eventData };
+					newEvent['semaine'] = getNombreSemaineDate(eventDate);
 					newEvent['date'] = convertDateToAbregedStringFormat(eventDate);
-					newEvent['id'] = getNumeroDossier(allData);
+					newEvent['mois'] = eventDate.toLocaleString('default', { month: 'short' });
+					ligneInTableauADefinir++;
+					newEvent['ligne'] = ligneInTableauADefinir;
+					dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+					newEvent['id'] = dernierNumeroDossier;
 					allData.push(newEvent);
-					toAdd.push(keysEvent.map((key) => newEvent[key] || ''));
+					let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+					toAdd.push(newEventArray);
 				}
 				break;
 			default:
 				console.log('Erreur de répétition, aucun paramètres données');
 				break;
 		}
+	} else {
+		Logger.log(eventRepeatData['repeat']);
+		Logger.log('Aucune répétition');
 	}
+
+	// Répétition par occurrence
+	let copyOfEventRepeatData = { ...eventRepeatData };
+	delete copyOfEventRepeatData['repeat'];
+	if (Object.keys(copyOfEventRepeatData).length > 0) {
+		Logger.log('Répétition par occurrence');
+		await Object.entries(copyOfEventRepeatData).forEach(async ([position, value]) => {
+			Logger.log("Création de l'événement : " + ligneInTableauADefinir);
+			position = copyOfEventRepeatData[position];
+			let newEvent = { ...eventData };
+			newEvent['semaine'] = getNombreSemaineDate(new Date(position['occurrence2']));
+			newEvent['date'] = convertDateToAbregedStringFormat(new Date(position['occurrence2']));
+			newEvent['mois'] = new Date(position['occurrence2']).toLocaleString('default', { month: 'short' });
+			dernierNumeroDossier = incrementNumeroDossier(dernierNumeroDossier);
+			newEvent['id'] = dernierNumeroDossier;
+			ligneInTableauADefinir++;
+			newEvent['ligne'] = ligneInTableauADefinir;
+			newEvent['heurePublication'] = position['occurrence3'];
+			newEvent['titre'] = position['occurrence4'];
+			newEvent['type'] = position['occurrence1'] == 'IG STORY' ? 'Story' : position['occurrence5'];
+			newEvent['reseau'] = position['occurrence1'] == 'IG STORY' ? 'IG' : position['occurrence1'];
+
+			allData.push(newEvent);
+			let newEventArray = keysEvent.map((key) => newEvent[key] || '');
+			Logger.log(newEventArray);
+			toAdd.push(newEventArray);
+		});
+	}
+	const lines = toAdd.map((row) => row[1]);
+	toAdd = toAdd.map((row) => row.slice(2));
+	const result = appendDataToSpreadsheet(tableauUsed + '!A1', sheetID, toAdd);
+	Logger.log(result);
 	Logger.log(toAdd);
-	return [1, toAdd];
+	return [1, toAdd, lines];
+}
+
+function checkIfAccess() {
+	const email = Session.getActiveUser().getEmail();
+	Logger.log(email);
+	const AllGroup = GroupsApp.getGroups();
+	for (let i = 0; i < AllGroup.length; i++) {
+		if (AllGroup[i].getEmail() == groupGoogleMail) {
+			Logger.log('Accès autorisé');
+			return true;
+		}
+	}
+	Logger.log('Accès non autorisé');
+	return false;
 }

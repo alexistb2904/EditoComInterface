@@ -293,13 +293,57 @@
 			}
 		});
 
+		appearLoadingSpinner();
 		await checkCategorie();
 
+		// Mettre a jour la date sélectionnée
 		updateDaysSelected(selectedDate);
 
+		// Afficher les réseaux dans le menu de gauche
 		await appearCategoriesInListLeft();
+		// Afficher les clé a montrer dans le menu de droite
 		await generateListElementToShow();
+		// Afficher les couleurs des réseaux dans le menu de droite
 		await generateListReseauColor();
+		killLoadingSpinner();
+
+		/*async function hasAutorization() {
+			appearLoadingSpinner();
+			const result = await new Promise((resolve, reject) => {
+				google.script.run
+					.withSuccessHandler(async (result) => {
+						if (result == true) {
+							// Récupération des catégories
+							await checkCategorie();
+
+							// Mettre a jour la date sélectionnée
+							updateDaysSelected(selectedDate);
+
+							// Afficher les réseaux dans le menu de gauche
+							await appearCategoriesInListLeft();
+							// Afficher les clé a montrer dans le menu de droite
+							await generateListElementToShow();
+							// Afficher les couleurs des réseaux dans le menu de droite
+							await generateListReseauColor();
+							killLoadingSpinner();
+						} else {
+							popUp('red', 10000, "Tu n'as pas les autorisations nécessaires pour accéder à cette application", '', 'error');
+							console.error("Tu n'as pas les autorisations nécessaires pour accéder à cette application");
+							alert("Ton compte n'a pas les autorisations nécessaires pour accéder à cette application");
+						}
+
+						resolve(result);
+					})
+					.withFailureHandler((error) => {
+						killLoadingSpinner();
+						console.error(error);
+						reject(error);
+					})
+					.checkIfAccess();
+			});
+		}
+
+		await hasAutorization();*/
 
 		/***************************************** Gestion des Préférences non essentielles ***********************************************/
 		// Dark Mode
@@ -351,6 +395,21 @@
 			}
 		});
 
+		// Utiliser les heures pour le placement des événements
+		document.querySelector('#useHours-preference md-switch').addEventListener('click', async (e) => {
+			if (e.target.selected) {
+				await DB.saveItem(dbName, 'Preferences', { id: 'useHoursPlacement', value: 'useHoursPlacement', used: false });
+			} else {
+				await DB.saveItem(dbName, 'Preferences', { id: 'useHoursPlacement', value: 'useHoursPlacement', used: true });
+			}
+			updateDaysSelected(selectedDate);
+		});
+		if (!(await DB.getItem(dbName, 'Preferences', 'useHoursPlacement'))) {
+			await DB.saveItem(dbName, 'Preferences', { id: 'useHoursPlacement', value: 'useHoursPlacement', used: true });
+			updateDaysSelected(selectedDate);
+		}
+		document.querySelector('#useHours-preference md-switch').selected = (await isPreferenceUsed('useHoursPlacement')) ? true : false;
+
 		// Taille menu de gauche
 		function calculTailleMenuGaucheDroite(valeurSlider, computedStyle) {
 			const multiplyBy = valeurSlider >= 2 ? parseFloat(parseFloat(valeurSlider) / 1.5) : valeurSlider;
@@ -393,13 +452,14 @@
 			await DB.saveItem(dbName, 'Preferences', { id: 'numberOfColumnSameTime', value: e.target.value, used: true });
 
 			contentCalendar.style.setProperty('--widthColumns', 99 / e.target.value + '%');
+			updateWidthOfLines();
 		});
 
 		document.querySelector('#numberOfColumnSameTime-preference md-filled-text-field').value = (await isPreferenceUsed('numberOfColumnSameTime'))
 			? await isPreferenceUsed('numberOfColumnSameTime')
 			: 7;
 		contentCalendar.style.setProperty('--widthColumns', 99 / document.querySelector('#numberOfColumnSameTime-preference md-filled-text-field').value + '%');
-
+		updateWidthOfLines();
 		/***************************************** Fonctions fondamentales ***********************************************/
 
 		async function isPreferenceUsed(id, verifyUsed = true) {
@@ -524,7 +584,40 @@
 			}
 		}
 
-		async function calendarUpdate() {
+		function updateWidthOfLines() {
+			const offsetLeft = document.querySelector('#calendar-special-column').offsetWidth;
+			const innerWidthOfCalendar = document.querySelectorAll('.calendar-columns');
+			const listOfCSSStylesSheet = document.styleSheets;
+			for (let i = 0; i < listOfCSSStylesSheet.length; i++) {
+				const styleSheet = listOfCSSStylesSheet[i];
+				if (styleSheet.href == null) {
+					const rules = styleSheet.cssRules;
+					for (let i = 0; i < rules.length; i++) {
+						if (rules[i].selectorText == '.calendar-line') {
+							rules[i].style.width = 0 + 'px';
+							rules[i].style.left = 0 + 'px';
+						}
+					}
+				}
+			}
+			let combinedWidth = 0;
+			innerWidthOfCalendar.forEach((column) => (combinedWidth += column.offsetWidth));
+			for (let i = 0; i < listOfCSSStylesSheet.length; i++) {
+				const styleSheet = listOfCSSStylesSheet[i];
+				if (styleSheet.href == null) {
+					const rules = styleSheet.cssRules;
+					for (let i = 0; i < rules.length; i++) {
+						if (rules[i].selectorText == '.calendar-line') {
+							rules[i].style.width = combinedWidth + 'px';
+							rules[i].style.left = offsetLeft + 'px';
+						}
+					}
+				}
+			}
+		}
+		window.addEventListener('resize', updateWidthOfLines);
+
+		async function calendarUpdate(forceRefresh = false) {
 			appearLoadingSpinner();
 			// Utilisation monthToGet si forme = "DEC 2024" ou "mmm yyyy"
 			//monthToGet = selectedDate.toLocaleDateString('fr-FR', { month: 'long' }).replace('é', 'e').replace('è', 'e').slice(0, 3).toUpperCase();
@@ -540,15 +633,52 @@
 					await createColumnsMonth();
 					break;
 			}
+			console.log(await isPreferenceUsed('useHoursPlacement'));
+			if (await isPreferenceUsed('useHoursPlacement')) {
+				console.log('Utilisation des heures');
+				document.querySelector('#listOfHours').style.display = '';
+				document.querySelectorAll('.calendar-line').forEach((line) => {
+					line.style.display = '';
+				});
+			} else {
+				document.querySelector('#listOfHours').style.display = 'none';
+				document.querySelectorAll('.calendar-line').forEach((line) => {
+					line.style.display = 'none';
+				});
+			}
 			// Récupération des événements
 			const dateAtStart = getFirstAndLastDayOfWeek(selectedDate)[0];
-			//await retrieveEvents(monthToGet + ' ' + new Date(selectedDate).getFullYear(), dateAtStart);
-			await retrieveEvents('Objectifs ' + new Date(selectedDate).getFullYear(), dateAtStart);
 
-			// Affichage des événements
-			displayEvents();
-			// Disparition du spinner
-			killLoadingSpinner();
+			const eventsExistings = await DB.getAllItems(dbName, 'Events');
+			if (eventsExistings.length == 0) {
+				appearLoadingSpinner(2);
+				console.log('Récupération des événements');
+				await Promise.all([retrieveEvents('Planning ' + new Date(selectedDate).getFullYear(), dateAtStart, true, forceRefresh)]);
+				//await retrieveEvents('Planning ' + new Date(selectedDate).getFullYear(), dateAtStart, true, forceRefresh);				console.log('Récupération Terminée');
+				// Affichage des événements
+				killLoadingSpinner(2);
+				console.log('Affichage des événements');
+				displayEvents();
+				console.log('Affichage des événements Terminée');
+
+				// Disparition du spinner
+				killLoadingSpinner();
+			} else {
+				appearLoadingSpinner();
+				console.log('Affichage des événements');
+				displayEvents();
+				console.log('Affichage des événements Terminée');
+				killLoadingSpinner();
+				appearLoadingSpinner(2);
+				console.log('Récupération des événements');
+				const value = await Promise.all([retrieveEvents('Planning ' + new Date(selectedDate).getFullYear(), dateAtStart, true, forceRefresh)]);
+				if (value[0] == true) {
+					displayEvents();
+				}
+				//await retrieveEvents('Planning ' + new Date(selectedDate).getFullYear(), dateAtStart, true, forceRefresh);
+				console.log('Récupération Terminée');
+				killLoadingSpinner(2);
+			}
 		}
 
 		async function createColumnsWeek() {
@@ -556,6 +686,10 @@
 			// Suppression des colonnes existantes et anciens paramètres
 			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
 			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#listOfHours').style.opacity = '';
+			document.querySelectorAll('.calendar-line').forEach((line) => {
+				line.style.display = '';
+			});
 			document.querySelector('#dateStr-info').innerHTML = '';
 
 			// Création des colonnes
@@ -602,6 +736,10 @@
 			// Suppression des colonnes existantes et anciens paramètres
 			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
 			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#listOfHours').style.opacity = '';
+			document.querySelectorAll('.calendar-line').forEach((line) => {
+				line.style.display = '';
+			});
 			document.querySelector('#dateStr-info').innerHTML = '';
 
 			// Création des colonnes
@@ -636,48 +774,71 @@
 
 		async function createColumnsMonth() {
 			appearLoadingSpinner(2);
-			// Suppression des colonnes existantes et anciens paramètres
+
+			// Clear existing columns and parameters
 			contentCalendar.querySelectorAll('.calendar-columns').forEach((column) => column.remove());
 			contentCalendar.querySelectorAll('.calendar-month').forEach((month) => month.remove());
+			document.querySelector('#listOfHours').style.opacity = '0';
+			document.querySelectorAll('.calendar-line').forEach((line) => {
+				line.style.display = 'none';
+			});
 			document.querySelector('#dateStr-info').innerHTML = '';
 
-			// Création des colonnes
+			// Create month columns
 			const monthDiv = document.createElement('div');
 			monthDiv.className = 'calendar-month';
+
 			const monthStr = selectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 			document.querySelector('#dataStr-content').textContent = monthStr;
+
 			const todayDate = new Date();
 			const fakeDay = new Date(selectedDate);
 			fakeDay.setDate(1);
+
+			// Adjust to start on Monday
+			while (fakeDay.getDay() !== 1) {
+				fakeDay.setDate(fakeDay.getDate() - 1);
+			}
+
 			const numberOfDays = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-			for (let i = 1; i <= numberOfDays; i++) {
+			const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+			while (fakeDay <= lastDayOfMonth) {
 				const columns = document.createElement('div');
 				columns.className = 'calendar-columns';
 				columns.dataset.identifier = formatDate(fakeDay);
+
 				let styleCustom = '';
-				if (fakeDay.toLocaleDateString() == todayDate.toLocaleDateString()) {
+				if (fakeDay.toLocaleDateString() === todayDate.toLocaleDateString()) {
 					styleCustom = 'style="font-weight: 700;"';
 				}
+
 				columns.innerHTML = `
-					<div class="calendar-columns-header">
-							<span class="calendar-columns-header-title" ${styleCustom}>${fakeDay.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}</span>
-							<div class="calendar-columns-header-info"></div>
-					</div>
-					<div class="calendar-columns-content"></div>`;
+            <div class="calendar-columns-header">
+                <span class="calendar-columns-header-title" ${styleCustom}>
+                    ${fakeDay.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                </span>
+                <div class="calendar-columns-header-info"></div>
+            </div>
+            <div class="calendar-columns-content"></div>
+        `;
+
 				const listOfChips = await checkChipsForDays(fakeDay);
 				if (listOfChips) {
 					listOfChips.forEach((chip) => {
 						columns.querySelector('.calendar-columns-header-info').appendChild(chip);
 					});
 				}
+
 				fakeDay.setDate(fakeDay.getDate() + 1);
 				monthDiv.appendChild(columns);
 			}
+
 			contentCalendar.appendChild(monthDiv);
 			killLoadingSpinner(2);
 		}
 
-		async function updateDaysSelected(date) {
+		async function updateDaysSelected(date, forceRefresh = false) {
 			selectedDate = date;
 			await DB.saveItem(dbName, 'Preferences', { id: 'selectedDate', value: selectedDate, used: (await isPreferenceUsed('selectedDate')) ? true : false });
 			[firstDayOfWeek, lastDayOfWeek] = getFirstAndLastDayOfWeek(selectedDate);
@@ -691,7 +852,7 @@
 				flatDatePicker.set('mode', 'range');
 				changePickerDate([new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)]);
 			}
-			calendarUpdate();
+			calendarUpdate(forceRefresh);
 		}
 
 		function navigationNext() {
@@ -741,21 +902,24 @@
 				//id: event[COL_RESEAU] + event[COL_TITRE] + ligne + '_' + tableau,
 				tableau: tableau,
 				ligne: ligne,
+				mois: event[COL_MOIS] ? event[COL_MOIS].trim() : '',
 				semaine: event[COL_SEMAINE],
 				reseau: event[COL_RESEAU],
 				date: event[COL_DATE] ? convertAbregedStringToDate(event[COL_DATE], tableau) : '',
 				heurePublication: event[COL_HEURE_PUBLICATION],
 				titre: event[COL_TITRE],
 				dateEvent: event[COL_DATE_EVENT],
+				etat: event[COL_ETAT],
 				type: event[COL_TYPE],
 				etatCrea: event[COL_ETAT_CREA],
 				etatEdito: event[COL_ETAT_EDITO],
 				etatMinia: event[COL_ETAT_MINIA],
 				precision: event[COL_PRECISION],
+				stratComADC: event[COL_STRAT_COM_ADC],
 				items: event[COL_ITEMS],
+        items2025: event[COL_ITEMS_25],
 				couvertureS1: event[COL_COUV_S1],
 				couvertureNonFollowerS1Pourcent: event[COL_COUV_NONFOLLOW_S1_POURCENT],
-				couvertureNonFollowerS1Nombre: event[COL_COUV_NONFOLLOW_S1_NB],
 				likeS1: event[COL_LIKE_S1],
 				commentS1: event[COL_COMMENT_S1],
 				partageS1: event[COL_PARTAGE_S1],
@@ -766,8 +930,6 @@
 				clicLien: event[COL_CLIC_LIEN],
 				engagementS1: event[COL_ENGAGEMENT_S1],
 				remarques: event[COL_REMARQUES],
-				oldObjectifs: event[COL_OLD_OBJECTIFS],
-				oldPilliersEdito: event[COL_OLD_PILLIERS_EDITO],
 			};
 			if (getListKeys) {
 				return Object.keys(format);
@@ -777,117 +939,133 @@
 		}
 
 		async function retrieveEvents(tableau = 'Event', dateAtStart, pushToDB = true, forceRefresh = false) {
-			appearLoadingSpinner(2);
-			let range = '';
-			let ligneToStart = 2;
-			let lastEventUpdate = await DB.getItem(dbName, 'Variables', 'lastEventUpdate');
-			if (lastEventUpdate) {
-				lastEventUpdate = lastEventUpdate['value'];
-			}
-			if (!lastEventUpdate || new Date(lastEventUpdate).getTime() < new Date().getTime() - 15000 || forceRefresh) {
-				range = '' + tableau + '!' + colonneMin + '' + ligneToStart + ':' + colonneMax;
-				google.script.run.withSuccessHandler(eventRetrieved).withFailureHandler(errorHandler).getDataFromSpreadsheet(range);
-
-				await DB.saveItem(dbName, 'Variables', { id: 'lastEventUpdate', value: new Date() });
-			} else {
-				console.warn(
-					'Récupération des événements déjà effectuée il y a moins de 15 secondes (' + Math.abs((new Date(lastEventUpdate).getTime() - new Date().getTime()) / 1000) + ')'
-				);
-			}
-
-			async function eventRetrieved(events) {
-				console.log('Récupération des événements : ', events);
-				if (!comparerObjets(dateAtStart, getFirstAndLastDayOfWeek(selectedDate)[0])) {
-					console.warn('Dates changées.. Abandon de la récupération des événements');
-					return;
+			return new Promise(async (resolve, reject) => {
+				let range = '';
+				let ligneToStart = 2;
+				let lastEventUpdate = await DB.getItem(dbName, 'Variables', 'lastEventUpdate');
+				if (lastEventUpdate) {
+					lastEventUpdate = lastEventUpdate['value'];
 				}
-				let missingKey = [];
-				console.groupCollapsed('Récupération des événements ' + tableau);
-				let ligne = ligneToStart;
-				let eventsJSON = {};
-				events.forEach(async (event) => {
-					ligne += 1;
-					/******** A ENLEVER / MODIFIER ********
-					if (event[0] != '') {
-						const formatedEvent = await formatEvent(event, tableau, ligne - 1);
-						eventsJSON[formatedEvent['id']] = formatedEvent;
-					}
-					/******** A ENLEVER / MODIFIER ********/
+				if (!lastEventUpdate || new Date(lastEventUpdate).getTime() < new Date().getTime() - 15000 || forceRefresh) {
+					range = '' + tableau + '!' + colonneMin + '' + ligneToStart + ':' + colonneMax;
+					google.script.run
+						.withSuccessHandler(async function (result) {
+							let resultRetrieved = false;
+							if (result) {
+								resultRetrieved = await eventRetrieved(result);
+								console.log('Résultat récupéré : ', resultRetrieved);
+							}
+							if (resultRetrieved) {
+								resolve(true);
+							} else {
+								resolve(false);
+							}
+						})
+						.withFailureHandler(errorHandler)
+						.getDataFromSpreadsheet(range);
 
-					if (event[0] != '') {
-						if (!event[COL_ID]) {
-							missingKey.push("Clé primaire manquante pour l'événement ligne " + (ligne - 1) + ' dans ' + tableau + ' : ', event);
-						} else {
-							const formatedEvent = await formatEvent(event, tableau, ligne - 1);
-							eventsJSON[event[COL_ID] + '_' + tableau] = formatedEvent;
-						}
+					await DB.saveItem(dbName, 'Variables', { id: 'lastEventUpdate', value: new Date() });
+				} else {
+					console.warn(
+						'Récupération des événements déjà effectuée il y a moins de 15 secondes (' +
+							Math.abs((new Date(lastEventUpdate).getTime() - new Date().getTime()) / 1000) +
+							')'
+					);
+					resolve(false);
+				}
+
+				async function eventRetrieved(events) {
+					console.log('Événements Récupéré: ', events);
+					let toReturn = false;
+					if (!comparerObjets(dateAtStart, getFirstAndLastDayOfWeek(selectedDate)[0])) {
+						console.warn('Dates changées.. Abandon de la récupération des événements');
+						return toReturn;
 					}
-				});
-				if (pushToDB) {
-					const allEvents = (await DB.getAllItems(dbName, `Events`)) || [];
-					const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value;
-					let eventsToSave = {};
-					console.time('Comparaison des événements');
-					allEvents.forEach(async (event) => {
-						if (!eventsJSON[event.id]) {
-							console.log('Event supprimé : ', event.id);
-							await DB.deleteItem(dbName, `Events`, event.id);
-						}
-					});
-					console.timeEnd('Comparaison des événements');
-					console.time('Sauvegarde des événements');
-					eventsJSON = Object.values(eventsJSON);
-					eventsJSON.forEach(async (event) => {
-						if (!allEvents.find((e) => e.id == event.id)) {
-							eventsToSave[event.id] = event;
-						} else {
-							if (
-								!comparerObjets(
-									allEvents.find((e) => e.id == event.id),
-									event
-								)
-							) {
-								eventsToSave[event.id] = event;
-								console.log(
-									'Event modifié : \n Ancien : ',
-									allEvents.find((e) => e.id == event.id),
-									'\n Nouveau : ',
-									event
-								);
+					let missingKey = [];
+					console.groupCollapsed('Récupération des événements ' + tableau);
+					let ligne = ligneToStart;
+					let eventsJSON = {};
+					events.forEach(async (event) => {
+						ligne += 1;
+
+						if (event[0] != '') {
+							if (!event[COL_ID]) {
+								missingKey.push("Clé primaire manquante pour l'événement ligne " + (ligne - 1) + ' dans ' + tableau + ' : ', event);
+							} else {
+								const formatedEvent = await formatEvent(event, tableau, ligne - 1);
+								eventsJSON[event[COL_ID] + '_' + tableau] = formatedEvent;
 							}
 						}
-
-						if (!allCategories[event.reseau]) {
-							await ajusterCategorie(event.reseau);
-						}
 					});
-					console.timeEnd('Sauvegarde des événements');
-					console.time('Sauvegarde des événements dans la base de données');
-
-					if (_.isEmpty(eventsToSave)) {
-						console.log('Aucun événement à sauvegarder');
-					} else {
-						eventsToSave = Object.values(eventsToSave);
-						eventsToSave.forEach(async (event) => {
-							await DB.saveItem(dbName, `Events`, event);
+					if (pushToDB) {
+						const allEvents = (await DB.getAllItems(dbName, `Events`)) || [];
+						const allCategories = (await DB.getItem(dbName, 'Variables', 'listCategories')).value;
+						let eventsToSave = {};
+						console.time('Comparaison des événements');
+						allEvents.forEach(async (event) => {
+							if (!eventsJSON[event.id]) {
+								console.log('Event supprimé : ', event.id);
+								await DB.deleteItem(dbName, `Events`, event.id);
+								//document.querySelector('.calendar-event[data-id="' + event.id + '"]').remove();
+							}
 						});
-						console.log('Il y a ', eventsToSave.length, ' événements à sauvegarder');
-						displayEvents();
+						console.timeEnd('Comparaison des événements');
+						console.time('Sauvegarde des événements');
+						eventsJSON = Object.values(eventsJSON);
+						eventsJSON.forEach(async (event) => {
+							if (!allEvents.find((e) => e.id == event.id)) {
+								eventsToSave[event.id] = event;
+							} else {
+								if (
+									!comparerObjets(
+										allEvents.find((e) => e.id == event.id),
+										event
+									)
+								) {
+									eventsToSave[event.id] = event;
+									console.log(
+										'Event modifié : \n Ancien : ',
+										allEvents.find((e) => e.id == event.id),
+										'\n Nouveau : ',
+										event
+									);
+								}
+							}
+
+							if (!allCategories[event.reseau]) {
+								await ajusterCategorie(event.reseau);
+							}
+						});
+						console.timeEnd('Sauvegarde des événements');
+						console.time('Sauvegarde des événements dans la base de données');
+
+						if (_.isEmpty(eventsToSave)) {
+							console.log('Aucun événement à sauvegarder');
+							toReturn = false;
+						} else {
+							eventsToSave = Object.values(eventsToSave);
+							eventsToSave.forEach(async (event) => {
+								await DB.saveItem(dbName, `Events`, event);
+							});
+							console.log('Il y a ', eventsToSave.length, ' événements à sauvegarder');
+							console.timeEnd('Sauvegarde des événements dans la base de données');
+							console.log('Events sauvegardés dans la base de données');
+							toReturn = true;
+						}
+					} else {
+						console.groupEnd();
+						resolve(eventsJSON);
+						return eventsJSON;
 					}
-					console.timeEnd('Sauvegarde des événements dans la base de données');
-					console.log('Events sauvegardés dans la base de données');
-				} else {
 					console.groupEnd();
-					return eventsJSON;
+					if (missingKey.length > 0) {
+						console.groupCollapsed('Clés manquantes');
+						console.warn(missingKey);
+						console.groupEnd();
+					}
+					return toReturn;
 				}
-				console.groupEnd();
-				if (missingKey.length > 0) {
-					console.groupCollapsed('Clés manquantes');
-					console.warn(missingKey);
-					console.groupEnd();
-				}
-			}
-			killLoadingSpinner(2);
+			});
 		}
 		/***************************************** Gestions des reseaux ***********************************************/
 
@@ -1021,6 +1199,7 @@
 			});
 			console.groupEnd();
 			actualiseZIndex();
+			updateWidthOfLines();
 		}
 
 		function actualiseZIndex() {
@@ -1029,7 +1208,7 @@
 			columns.forEach((columns) => {
 				const eventContainers = columns.querySelectorAll('.calendar-event-container');
 				const sortedEventContainers = Array.from(eventContainers).sort((a, b) => {
-					return a.dataset.heureDebut - b.dataset.heureDebut;
+					return a.dataset.heurePublication - b.dataset.heurePublication;
 				});
 				sortedEventContainers.forEach((eventContainer, index) => {
 					eventContainer.dataset.zIndex = index + 1;
@@ -1047,19 +1226,43 @@
 			});
 		}
 
+		function calculPosition(event) {
+			const heurePublication = event.heurePublication.split(':');
+			const position1 = parseInt(heurePublication[0]) - 6 < 0 ? 1 : parseInt(heurePublication[0]) - 6;
+			const position = position1 * 5 + (parseInt(heurePublication[1]) * 5) / 60;
+			return position;
+		}
+
+		function calculHauteur(event) {
+			const heurePublication = event.heurePublication.split(':');
+			const heureFin = event.heureFin.split(':');
+			const position1 = parseInt(heurePublication[0]) - 6 < 0 ? 1 : parseInt(heurePublication[0]) - 6;
+			const position2 = parseInt(heureFin[0]) - 6 < 0 ? 1 : parseInt(heureFin[0]) - 6;
+			const position = position2 * 5 + (parseInt(heureFin[1]) * 5) / 60;
+			const hauteur = position - (position1 * 5 + (parseInt(heurePublication[1]) * 5) / 60);
+			return hauteur;
+		}
+
 		async function appearEventIntoColumns(column, eventsList) {
 			const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
 			let allKeysWhatToShow = await DB.getItem(dbName, 'Preferences', 'whatToShow');
 			let keysToShow = Object.values(Object.values(allKeysWhatToShow)[1]);
 			eventsList.forEach(async (event) => {
-				let calendarContainer = column.querySelector(`.calendar-event-container[data-heure-debut="${event.heureDebut}"]`);
-				if (viewMode == 'week') {
+				let calendarContainer = column.querySelector(`.calendar-event-container[data-heure-publication="${event.heurePublication}"]`);
+				if (viewMode == 'week' || viewMode == 'day') {
 					if (!calendarContainer) {
 						calendarContainer = document.createElement('div');
 						calendarContainer.className = 'calendar-event-container';
-						calendarContainer.dataset.heureDebut = event.heureDebut;
+						calendarContainer.dataset.heurePublication = event.heurePublication;
+						if (await isPreferenceUsed('useHoursPlacement')) {
+							calendarContainer.style.top = calculPosition(event) + 'vh';
+						} else {
+							calendarContainer.style.position = 'initial';
+							calendarContainer.style.flexDirection = 'column';
+						}
 						/*calendarContainer.style.width = column.clientWidth + 'px';
-						document.querySelector('#content').addEventListener('resize', () => {
+						window.addEventListener('resize', () => {
+							calendarContainer.style.top = calculPosition(event) + 'vh';
 							calendarContainer.style.width = column.clientWidth + 'px';
 						});*/
 					}
@@ -1070,10 +1273,17 @@
 				eventElement.dataset.tableau = event.tableau;
 				eventElement.dataset.ligne = event.ligne;
 				eventElement.dataset.date = event.date;
+				eventElement.dataset.etat = event.etat;
+				eventElement.dataset.viewmode = viewMode;
 				if (event.reseau == 'IG' && event.type == 'Story') {
 					event.reseau = 'IG STORY';
 				}
 				eventElement.dataset.reseau = event.reseau;
+
+				const eventDot = document.createElement('div');
+				eventDot.className = 'calendar-event-dot';
+				eventDot.title = 'État : ' + event.etat;
+
 				const eventContent = document.createElement('div');
 				eventContent.className = 'calendar-event-content';
 
@@ -1095,7 +1305,6 @@
 						const keyToShow = key.value;
 						switch (keyToShow) {
 							case 'date':
-							case 'dateEvent':
 								eventContent.innerHTML += `<div class="calendar-event-content-date">${convertDateToAbregedString(new Date(event[keyToShow]))}</div>`;
 								break;
 							case 'titre':
@@ -1111,10 +1320,16 @@
 				}
 
 				await getKeys();
+				eventElement.appendChild(eventDot);
 				eventElement.appendChild(eventContent);
-				if (viewMode == 'week') {
+				if (viewMode == 'week' || viewMode == 'day') {
 					calendarContainer.appendChild(eventElement);
-					column.querySelector('.calendar-columns-content').appendChild(calendarContainer);
+					if (!column.querySelector(`.calendar-event-container[data-heure-publication="${event.heurePublication}"]`)) {
+						column.querySelector('.calendar-columns-content').appendChild(calendarContainer);
+					} else {
+						column.querySelector(`.calendar-event-container[data-heure-publication="${event.heurePublication}"]`).appendChild(eventElement);
+					}
+					//calendarContainer.style.width = column.clientWidth + 'px';
 				} else {
 					column.querySelector('.calendar-columns-content').appendChild(eventElement);
 				}
@@ -1137,6 +1352,7 @@
 						if (!categorie.show) {
 							if (viewMode == 'week' || viewMode == 'month') {
 								eventElement.style.height = '0';
+								eventElement.style.width = '0';
 							} else {
 								column.classList.add('inactive');
 							}
@@ -1146,12 +1362,14 @@
 
 				let beforeColor = eventContent.style.backgroundColor;
 				const insideHeight = eventContent.scrollHeight;
+				const heightStyle = getComputedStyle(document.querySelector('#content')).getPropertyValue('--heightHours').trim();
+				eventElement.dataset.height = heightStyle;
 
 				eventElement.addEventListener('mouseenter', () => {
 					const colorBackground = eventContent.style.backgroundColor;
 					beforeColor = colorBackground;
 					if (eventElement.clientHeight < insideHeight) {
-						eventElement.style.height = '100%';
+						eventElement.style.height = 'fit-content';
 					}
 					eventContent.style.backgroundColor = lighterColor(colorBackground, 0.5);
 					eventContent.querySelectorAll('div').forEach((element) => {
@@ -1161,7 +1379,7 @@
 
 				eventElement.addEventListener('mouseleave', () => {
 					eventContent.style.backgroundColor = beforeColor;
-					eventElement.style.height = '';
+					eventElement.style.height = heightStyle;
 					eventContent.querySelectorAll('div').forEach((element) => {
 						element.style.whiteSpace = '';
 					});
@@ -1209,6 +1427,7 @@
 						case 'tableau':
 						case 'ligne':
 						case 'semaine':
+						case 'mois':
 							wrapperEvent.style.display = 'none';
 							const hiddenElement = document.createElement('input');
 							hiddenElement.type = 'hidden';
@@ -1222,11 +1441,11 @@
 							break;
 						case 'type':
 						case 'items':
-						case 'oldObjectifs':
-						case 'oldPilliersEdito':
+						case 'items2025':
 						case 'etatCrea':
 						case 'etatEdito':
 						case 'etatMinia':
+						case 'etat':
 							const nomVariable = key + 'Field';
 							if (listeSelect[nomVariable]) {
 								listeSelect[nomVariable].forEach((contenu) => {
@@ -1272,7 +1491,6 @@
 							});
 							break;
 						case 'date':
-						case 'dateEvent':
 							elementToAppend.required = true;
 							elementToAppend.type = 'date';
 							wrapperEvent.style.width = '100%';
@@ -1280,7 +1498,7 @@
 							wrapperEvent.appendChild(elementToAppend);
 							break;
 						case 'heurePublication':
-							elementToAppend.required = true;
+							elementToAppend.required = false;
 							elementToAppend.type = 'time';
 							wrapperEvent.style.width = '100%';
 							elementToAppend.value = event[key].split('h')[0] + ':' + (event[key].split('h')[1] ? event[key].split('h')[1] : '00');
@@ -1463,13 +1681,10 @@
 
 					const duplicateButton = document.createElement('md-outlined-button');
 
-					/******** A ENLEVER / MODIFIER ********/
-					duplicateButton.setAttribute('disabled', '');
-					/******** A ENLEVER / MODIFIER ********/
-
 					duplicateButton.textContent = 'Dupliquer';
 					duplicateButton.addEventListener('click', () => {
-						document.querySelector('#modal-in-big-event-container').remove();
+						killAll();
+						appearEventToCreate(event);
 					});
 					fakeDiv.appendChild(duplicateButton);
 
@@ -1521,7 +1736,6 @@
 					if (eventIsPassed) {
 						buttonSave.setAttribute('disabled', '');
 						deleteButton.setAttribute('disabled', '');
-						duplicateButton.setAttribute('disabled', '');
 						chipElement.textContent = 'Date de publication passé';
 						badges.appendChild(chipElement);
 					}
@@ -1537,7 +1751,10 @@
 			appearLoadingSpinner(2);
 			const keysEvent = formatEvent([], 'Event', 0, true);
 			const event = {};
-			const allFields = await getField(event, keysEvent, true);
+			let allFields = await getField(event, keysEvent, true);
+			if (data != '') {
+				allFields = await getField(data, keysEvent, true);
+			}
 
 			function moveKeyToTheEnd(key) {
 				const positionOfSearchedKey = keysEvent.indexOf(key);
@@ -1727,9 +1944,8 @@
 				console.log(eventRepeatData);
 
 				/*********************************************/
-				const tableauUsed = 'Objectifs ' + new Date(eventData['date']).getFullYear();
+				const tableauUsed = 'Planning ' + new Date(eventData['date']).getFullYear();
 				/*********************************************/
-
 				google.script.run
 					.withSuccessHandler(async (result) => {
 						killLoadingSpinner(1);
@@ -1737,20 +1953,30 @@
 							console.log(result);
 							try {
 								popUp('base', 1500, "Création de l'événement", "L'événement a été crée", 'celebration');
-								await DB.saveItem(dbName, 'Events', eventData);
-								updateDaysSelected(selectedDate);
+								console.log(result[1]);
+								result[1].forEach(async (event, index) => {
+									let eventFormatted = formatEvent(event, tableauUsed, 0);
+									eventFormatted['ligne'] = result[2][index];
+									await DB.saveItem(dbName, 'Events', eventFormatted);
+									console.log('Event created : ', eventFormatted);
+								});
+								updateDaysSelected(selectedDate, true);
+								killAll();
 							} catch (e) {
 								popUp('red', 8000, "Création de l'événement", e.message, 'error', true);
 								console.error(e);
+								killAll();
 							}
 						} else {
 							console.error(result);
 							popUp('red', 8000, "Création de l'événement", result, 'error', true);
+							killAll();
 						}
 					})
 					.withFailureHandler((result) => {
 						killLoadingSpinner(1);
-						popUp('base', 8000, "Modification de l'événement", result, 'error', true);
+						popUp('base', 8000, "Création de l'événement", result, 'error', true);
+						killAll();
 					})
 					.createEventInCalendar(eventData, eventRepeatData, tableauUsed, keysEvent);
 			});
@@ -1815,6 +2041,7 @@
 					if (viewMode == 'week' || viewMode == 'month') {
 						document.querySelectorAll('.calendar-event').forEach((event) => {
 							event.style.height = '';
+							event.style.width = '';
 						});
 					} else if (viewMode == 'day') {
 						document.querySelectorAll('.calendar-columns').forEach((event) => {
@@ -1825,6 +2052,7 @@
 					document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
 						checkbox.setAttribute('checked', '');
 					});
+					updateWidthOfLines();
 				});
 
 				boutonToutMasquer.addEventListener('click', async () => {
@@ -1838,6 +2066,7 @@
 					if (viewMode == 'week' || viewMode == 'month') {
 						document.querySelectorAll('.calendar-event').forEach((event) => {
 							event.style.height = '0';
+							event.style.width = '0';
 						});
 					} else if (viewMode == 'day') {
 						document.querySelectorAll('.calendar-columns').forEach((event) => {
@@ -1847,6 +2076,7 @@
 					document.querySelectorAll('#listeReseaux-menu label md-checkbox').forEach((checkbox) => {
 						checkbox.removeAttribute('checked');
 					});
+					updateWidthOfLines();
 				});
 
 				boutonUniquementOccupes.addEventListener('click', async () => {
@@ -1860,12 +2090,14 @@
 								reseau.show = true;
 								allCategoriesDOM.forEach((event) => {
 									event.style.height = '';
+									event.style.width = '';
 								});
 								checkboxDOM.setAttribute('checked', '');
 							} else {
 								reseau.show = false;
 								allCategoriesDOM.forEach((event) => {
 									event.style.height = '0';
+									event.style.width = '0';
 								});
 								checkboxDOM.removeAttribute('checked');
 							}
@@ -1886,6 +2118,7 @@
 						allCategoriesCopy[reseau.id] = reseau;
 						await DB.saveItem(dbName, 'Variables', { id: 'listCategories', value: allCategoriesCopy });
 					}
+					updateWidthOfLines();
 				});
 
 				for (const reseau in listeCategoriesJSON) {
@@ -1922,6 +2155,7 @@
 								document.querySelectorAll('.calendar-event').forEach((event) => {
 									if (event.dataset.reseau == reseau) {
 										event.style.height = reseauCheckbox.checked ? '' : '0';
+										event.style.width = reseauCheckbox.checked ? '' : '0';
 									}
 								});
 							} else {
@@ -1932,6 +2166,7 @@
 								});
 							}
 						}
+						updateWidthOfLines();
 					});
 				}
 			}
@@ -2207,6 +2442,172 @@
 			});
 		});
 
+		// Gestion menu recherche
+
+		const searchButton = document.querySelector('#search-button');
+		searchButton.addEventListener('click', () => {
+			searchMenuAppear();
+		});
+
+		async function searchMenuAppear() {
+			const searchMenuContainer = document.createElement('div');
+			searchMenuContainer.className = 'killable';
+			searchMenuContainer.id = 'search-menu-container';
+			const searchMenu = document.createElement('div');
+			searchMenu.id = 'search-menu';
+			searchMenu.innerHTML = `
+						<div slot="headline">
+							<md-outlined-text-field label="Rechercher" type="search" id="search-input" style="width: 100%">
+								<md-icon slot="leading-icon">search</md-icon>
+							</md-outlined-text-field>
+						</div>
+						<div slot="buttons">
+							<select id="filter-categorie" style="width: 100%">
+								<option selected aria-label="Réseaux">Tous</option>
+							</select>
+						</div>
+						<div slot="actions">
+							<md-outlined-button id="search-menu-close">Fermer</md-outlined-button>
+						</div>
+						<div slot="content" id="search-menu-content">
+
+						</div>
+						
+						`;
+
+			const filterCategorie = searchMenu.querySelector('#filter-categorie');
+			const allCategories = await DB.getItem(dbName, 'Variables', 'listCategories');
+			if (allCategories.length <= 0) {
+				setTimeout(() => {
+					searchMenuAppear();
+				}, 2000);
+			} else {
+				const allCategoriesValue = allCategories.value;
+				for (const categorie in allCategoriesValue) {
+					const option = document.createElement('option');
+					option.textContent = categorie;
+					option.setAttribute('aria-label', categorie);
+					filterCategorie.appendChild(option);
+				}
+			}
+
+			const searchMenuClose = searchMenu.querySelector('#search-menu-close');
+			searchMenuClose.addEventListener('click', () => {
+				killAll();
+			});
+
+			const allEvents = await DB.getAllItems(dbName, 'Events');
+			console.log('Il y a ', allEvents.length, ' événements');
+			const searchMenuRechercherInput = searchMenu.querySelector('#search-input');
+
+			const colorForEtatCreation = {
+				'Attente de brief': '#E8EAED', // light gray
+				'Brief écrit - Déposé': '#008000', // green
+				'En créa': '#ADD8E6', // light blue
+				'Faire valider': '#008000', // green
+				'Refaire valider': '#FFFF00', // yellow
+				'Mettre dans le drive': '#008000', // green
+				'Validé dans le drive': '#006400', // dark green
+				ANNULE: '#FF0000', // red
+				'': '#E8EAED', // light gray
+			};
+
+			const colorForEtatEdito = {
+				'Attente éléments': '#E8EAED', // light gray
+				'A écrire': '#9370DB', // mediumpurple
+				'Ecrit - à valider': '#008000', // green
+				'A réécrire': '#FFFF00', // yellow
+				Validé: '#006400', // dark green
+				'': '#E8EAED', // light gray
+			};
+
+			const colorForEtatMinia = {
+				'A faire': '#FFFF00', // yellow
+				'image dans le drive': '#ADD8E6', // light blue
+				'A valider': '#008000', // green
+				Refaire: '#FFFF00', // yellow
+				Validé: '#006400', // dark green
+				'': '#E8EAED', // light gray
+			};
+
+			searchMenuRechercherInput.addEventListener('input', async (event) => {
+				const searchValue = event.target.value;
+				await actualiseSearch(searchValue);
+			});
+
+			filterCategorie.addEventListener('change', async (event) => {
+				const searchValue = searchMenuRechercherInput.value;
+				await actualiseSearch(searchValue);
+			});
+
+			async function actualiseSearch(searchValue = '') {
+				const filterCategorieValue = searchMenu.querySelector('#filter-categorie').value;
+				const searchMenuContent = searchMenu.querySelector('#search-menu-content');
+				searchMenuContent.innerHTML = '';
+				allEvents.forEach(async (event) => {
+					const titre = event.titre;
+					const conditions = [
+						filterCategorieValue == 'Tous' || filterCategorieValue == '' || event.reseau == filterCategorieValue,
+						titre.toLowerCase().includes(searchValue.toLowerCase()) || searchValue == '',
+					];
+					if (conditions.every((condition) => condition)) {
+						const eventElement = document.createElement('div');
+						eventElement.className = 'search-event';
+						eventElement.dataset.id = event.id;
+						eventElement.dataset.date = event.date;
+						eventElement.dataset.reseau = event.reseau;
+						eventElement.dataset.type = event.type;
+						eventElement.dataset.titre = event.titre;
+						eventElement.dataset.heurePublication = event.heurePublication;
+						eventElement.dataset.etatCrea = event.etatCrea;
+						eventElement.dataset.etatEdito = event.etatEdito;
+						eventElement.dataset.etatMinia = event.etatMinia;
+
+						const badgeCrea = document.createElement('md-badge');
+						badgeCrea.textContent = 'État Crea : ' + event.etatCrea;
+						badgeCrea.dataset.color = colorForEtatCreation[event.etatCrea];
+						badgeCrea.style.backgroundColor = colorForEtatCreation[event.etatCrea];
+						badgeCrea.style.color = darkenColor(colorForEtatCreation[event.etatCrea], 0.75);
+
+						const badgeEdito = document.createElement('md-badge');
+						badgeEdito.textContent = 'État Edito : ' + event.etatEdito;
+						badgeEdito.dataset.color = colorForEtatEdito[event.etatEdito];
+						badgeEdito.style.backgroundColor = colorForEtatEdito[event.etatEdito];
+						badgeEdito.style.color = darkenColor(colorForEtatEdito[event.etatEdito], 0.75);
+
+						const badgeMinia = document.createElement('md-badge');
+						badgeMinia.textContent = 'État Minia : ' + event.etatMinia;
+						badgeMinia.dataset.color = colorForEtatMinia[event.etatMinia];
+						badgeMinia.style.backgroundColor = colorForEtatMinia[event.etatMinia];
+						badgeMinia.style.color = darkenColor(colorForEtatMinia[event.etatMinia], 0.75);
+
+						eventElement.innerHTML = `
+									<div class="search-event-content">
+										<div class="search-event-title">${event.titre}</div>
+										<br>
+										<div class="search-event-date">Date : ${formatDate(event.date)}</div>
+										<div class="search-event-reseau">Reseau :${event.reseau}</div>
+										<div class="search-event-type">Type : ${event.type}</div>
+										<div class="search-event-heurePublication">Heure publication :${event.heurePublication}</div>
+									</div>
+									<div class="search-event-etat">
+									</div>
+								`;
+
+						eventElement.querySelector('.search-event-etat').appendChild(badgeCrea);
+						eventElement.querySelector('.search-event-etat').appendChild(badgeEdito);
+						eventElement.querySelector('.search-event-etat').appendChild(badgeMinia);
+
+						await searchMenuContent.appendChild(eventElement);
+					}
+				});
+			}
+			await actualiseSearch();
+
+			searchMenuContainer.appendChild(searchMenu);
+			document.body.appendChild(searchMenuContainer);
+		}
+
 		/***************************************** Usefull Functions ******************************************/
 
 		/**
@@ -2224,17 +2625,17 @@
 			date = new Date(date);
 			debut = new Date(debut);
 			fin = new Date(fin);
-			if (!(date instanceof Date)) {
-				console.error("Le paramètre date n'est pas une date", oldDate);
+			if (date == 'Invalid Date') {
+				console.error("Le paramètre date n'est pas une date " + oldDate);
 				return false;
 			}
-			if (!(debut instanceof Date)) {
-				console.error("Le paramètre debut n'est pas une date", oldDebut);
+			if (debut == 'Invalid Date') {
+				console.error("Le paramètre debut n'est pas une date " + oldDebut);
 				return false;
 			}
 
-			if (!(fin instanceof Date)) {
-				console.error("Le paramètre fin n'est pas une date", oldFin);
+			if (fin == 'Invalid Date') {
+				console.error("Le paramètre fin n'est pas une date " + oldFin);
 				return false;
 			}
 
@@ -2248,7 +2649,7 @@
 			let timestampDebut = debut.getTime();
 			let timestampFin = fin.getTime();
 			if (isNaN(timestampDate) || isNaN(timestampDebut) || isNaN(timestampFin)) {
-				console.error('Tout les paramètres doivent être des objets Date.');
+				console.error('Tout les paramètres doivent être des objets Date. date : ', date, 'debut : ', debut, 'fin : ', fin);
 				return false;
 			}
 
@@ -2409,20 +2810,23 @@
 				novembre: 10,
 				décembre: 11,
 			};
-
-			try {
-				let dateSplit = dateString.split(' ');
-				let day = parseInt(dateSplit[1]);
-				let month = parseInt(dateSplit[2]) - 1;
-				let year = parseInt(tableau.split(' ')[1]);
-				//console.log('Date : ', day, month, year, dateString);
-				// Création de la date en spécifiant l'heure à midi pour éviter les problèmes de fuseau horaire
-				return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
-			} catch (error) {
-				console.log('Erreur à la ligne ' + lineInTable);
-				console.log(dateString);
-				console.log('Erreur : ' + error);
-				return new Error('Erreur' + error);
+			if (dateString) {
+				try {
+					let dateSplit = dateString.split(' ');
+					let day = parseInt(dateSplit[1]);
+					let month = parseInt(dateSplit[2]) - 1;
+					let year = parseInt(tableau.split(' ')[1]);
+					//console.log('Date : ', day, month, year, dateString);
+					// Création de la date en spécifiant l'heure à midi pour éviter les problèmes de fuseau horaire
+					return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+				} catch (error) {
+					console.log('Erreur à la ligne ' + lineInTable);
+					console.log(dateString);
+					console.log('Erreur : ' + error);
+					return new Error('Erreur' + error);
+				}
+			} else {
+				return new Error('Date non définie : ' + dateString);
 			}
 		}
 
@@ -2462,8 +2866,10 @@
 		}
 
 		function getWeekNumber(date) {
-			const startOfYear = new Date(date.getFullYear(), 0, 1);
-			const dayOfYear = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
+			const tempDate = new Date(date.getTime());
+			tempDate.setDate(tempDate.getDate() + 4 - (tempDate.getDay() || 7));
+			const startOfYear = new Date(tempDate.getFullYear(), 0, 1);
+			const dayOfYear = Math.floor((tempDate - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
 			return Math.ceil(dayOfYear / 7);
 		}
 
@@ -2601,9 +3007,17 @@
 					const loaderSpinnerContainer = document.createElement('div');
 					loaderSpinnerContainer.classList.add('spinnerBottomRight-container');
 					loaderSpinnerContainer.classList.add('killable');
+					const imageSpinner = document.createElement('img');
+					imageSpinner.src = 'https://www.academieduclimat.paris/app/uploads/2025/02/🧚.png';
+					imageSpinner.alt = 'She was a fairy';
+					imageSpinner.style.width = '80%';
+					imageSpinner.style.opacity = '0.5';
+					/*
 					const loaderSpinner = document.createElement('md-circular-progress');
 					loaderSpinner.setAttribute('indeterminate', '');
 					loaderSpinnerContainer.appendChild(loaderSpinner);
+					*/
+					loaderSpinnerContainer.appendChild(imageSpinner);
 
 					document.querySelector('body').appendChild(loaderSpinnerContainer);
 					// Fonction qui permet de gérer une exeption si le chargement est trop long
@@ -2648,7 +3062,7 @@
 				}
 				loadingTimeoutId2 = setTimeout(function () {
 					if (document.querySelector('.spinnerFullScreen-container') || document.querySelector('.spinnerBottomRight-container')) {
-						console.log('Erreur de chargement');
+						console.log('Erreur de chargement 2');
 						document.querySelector('.spinnerFullScreen-container').remove();
 						document.querySelector('.spinnerBottomRight-container').remove();
 						popUp(

@@ -58,8 +58,51 @@
 			<div id="listeReseaux-menu"></div>
 		</div>
 		<div id="content">
+			<div id="listOfHours">
+				<span id="regulateHeightHours"></span>
+				<span>6h00</span>
+				<span>7h00</span>
+				<span>8h00</span>
+				<span>9h00</span>
+				<span>10h00</span>
+				<span>11h00</span>
+				<span>12h00</span>
+				<span>13h00</span>
+				<span>14h00</span>
+				<span>15h00</span>
+				<span>16h00</span>
+				<span>17h00</span>
+				<span>18h00</span>
+				<span>19h00</span>
+				<span>20h00</span>
+				<span>21h00</span>
+				<span>22h00</span>
+				<span>23h00</span>
+				<span>00h00</span>
+			</div>
 			<div id="content-calendar" widthColumns="40">
 				<div id="calendar-special-column"></div>
+				<span class="calendar-line" data-order="1" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 1)"></span>
+				<span class="calendar-line" data-order="2" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 2)"></span>
+				<span class="calendar-line" data-order="3" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 3)"></span>
+				<span class="calendar-line" data-order="4" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 4)"></span>
+				<span class="calendar-line" data-order="5" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 5)"></span>
+				<span class="calendar-line" data-order="6" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 6)"></span>
+				<span class="calendar-line" data-order="7" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 7)"></span>
+				<span class="calendar-line" data-order="8" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 8)"></span>
+				<span class="calendar-line" data-order="9" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 9)"></span>
+				<span class="calendar-line" data-order="10" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 10)"></span>
+				<span class="calendar-line" data-order="11" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 11)"></span>
+				<span class="calendar-line" data-order="12" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 12)"></span>
+				<span class="calendar-line" data-order="13" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 13)"></span>
+				<span class="calendar-line" data-order="14" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 14)"></span>
+				<span class="calendar-line" data-order="15" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 15)"></span>
+				<span class="calendar-line" data-order="16" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 16)"></span>
+				<span class="calendar-line" data-order="17" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 17)"></span>
+				<span class="calendar-line" data-order="18" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 18)"></span>
+				<span class="calendar-line" data-order="19" style="top: calc(var(--halfHeightHours) + var(--heightHours) * 19)"></span>
+
+				<span class="calendar-line lineActiveHour"></span>
 			</div>
 			<div id="dateStr">
 				<div id="dateStr-container">
@@ -130,6 +173,10 @@
 					<label class="row-label" id="leftMenu-closable-preference" title="Rendre le menu de gauche rétractable">
 						Menu de gauche rétractable
 						<md-switch icons show-only-selected-icon aria-label="Rendre le menu de gauche rétractable"></md-switch>
+					</label>
+					<label class="row-label" id="useHours-preference" title="Utiliser les heures de publications">
+						Utiliser les heures de publications
+						<md-switch icons show-only-selected-icon aria-label="Utiliser les heures de publications"></md-switch>
 					</label>
 					<label class="column-label" id="widthLeftMenu-preference">
 						Taille menu de gauche
